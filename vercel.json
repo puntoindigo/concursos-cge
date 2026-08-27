@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/bot",
+      "schedule": "0 10 * * *"
+    }
+  ]
+}
