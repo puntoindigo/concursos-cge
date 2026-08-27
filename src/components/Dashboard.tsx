@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { DEPARTMENTS, LEVELS, CATEGORY_NAME } from '@/lib/categories'
+import InvitePanel from './InvitePanel'
 
 interface User {
   email: string
   name: string
   picture: string
+  isSuperadmin: boolean
 }
 
 interface WpPost {
@@ -381,8 +383,15 @@ export default function Dashboard({
             )}
           </div>
 
+          {/* Invite panel — superadmin only */}
+          {user.isSuperadmin && (
+            <div className="border-t border-gray-100">
+              <InvitePanel />
+            </div>
+          )}
+
           {/* Bot actions */}
-          <div className="p-5">
+          <div className="p-5 border-t border-gray-100">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Acciones</h2>
             <button
               onClick={() => runBotNow(false)}

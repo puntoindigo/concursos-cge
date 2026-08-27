@@ -1,21 +1,43 @@
-import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { getDb } from '@/db'
 import { config as configTable, state as stateTable } from '@/db/schema'
+import { getUser } from '@/lib/get-user'
 import Dashboard from '@/components/Dashboard'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
+  const auth = await getUser()
+
+  if (!auth.ok) {
+    if (auth.reason === 'no_cookie' || auth.reason === 'invalid_token') {
+      redirect('https://accounts.puntoindigo.com/api/auth/signin-google?next=' +
+        encodeURIComponent(process.env.APP_URL ?? 'https://concursos-cge.puntoindigo.com'))
+    }
+    // not_allowed
+    return (
+      <div style={{ fontFamily: 'sans-serif', textAlign: 'center', padding: '80px 24px' }}>
+        <h2 style={{ color: '#374151' }}>Acceso no autorizado</h2>
+        <p style={{ color: '#6b7280' }}>
+          Tu cuenta ({auth.reason}) no tiene acceso a esta aplicación.
+        </p>
+        <a href="https://accounts.puntoindigo.com/api/auth/logout"
+           style={{ color: '#4f46e5' }}>
+          Cerrar sesión
+        </a>
+      </div>
+    )
+  }
+
+  const user = {
+    email: auth.user.email,
+    name: auth.user.name ?? '',
+    picture: auth.user.picture ?? '',
+    isSuperadmin: auth.user.email.toLowerCase() === 'daeiman@gmail.com',
+  }
+
   let initialConfig = null
   let initialState = null
-
-  // User set by middleware via headers
-  const hdrs = await headers()
-  const user = {
-    email: hdrs.get('x-pi-email') ?? '',
-    name:  hdrs.get('x-pi-name') ?? '',
-    picture: hdrs.get('x-pi-picture') ?? '',
-  }
 
   try {
     const db = getDb()

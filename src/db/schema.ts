@@ -24,6 +24,14 @@ export const state = concursosCge.table('state', {
   lastFoundCount: integer('last_found_count').notNull().default(0),
 })
 
+export const allowedEmails = concursosCge.table('allowed_emails', {
+  id: integer('id').generatedAlwaysAsIdentity().primaryKey(),
+  email: text('email').notNull().unique(),
+  label: text('label'),       // nombre del invitado (opcional)
+  invitedBy: text('invited_by').notNull(),
+  invitedAt: timestamp('invited_at').defaultNow(),
+})
+
 export const runHistory = concursosCge.table('run_history', {
   id: integer('id').generatedAlwaysAsIdentity().primaryKey(),
   ranAt: timestamp('ran_at').defaultNow(),
