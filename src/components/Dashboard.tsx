@@ -219,18 +219,15 @@ export default function Dashboard({
     }
   }, [])
 
-  // Debounced fetch when filters change
+  // Debounced fetch when filters change — resets to page 1
   useEffect(() => {
     setPage(1)
     if (fetchTimer.current) clearTimeout(fetchTimer.current)
     fetchTimer.current = setTimeout(() => fetchPosts(cfg, 1, afterDays), 150)
     return () => { if (fetchTimer.current) clearTimeout(fetchTimer.current) }
   }, [cfg.categoryDepts, cfg.categoryLevels, cfg.searchString, afterDays, fetchPosts])
-
-  // Load more
-  useEffect(() => {
-    if (page > 1) fetchPosts(cfg, page, afterDays)
-  }, [page, fetchPosts, cfg, afterDays])
+  // NOTE: no separate useEffect for load-more — it's handled directly in the button click
+  // to avoid race conditions when filters change while page > 1.
 
   function toggleDept(id: number) {
     setCfg((c) => ({
@@ -543,7 +540,11 @@ export default function Dashboard({
 
               {page < wpTotalPages && (
                 <button
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => {
+                    const next = page + 1
+                    setPage(next)
+                    fetchPosts(cfg, next, afterDays)
+                  }}
                   disabled={loading}
                   className="w-full py-3 text-sm font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 rounded-xl transition-colors bg-white"
                 >

@@ -39,9 +39,8 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
 
   if (opts.after) params.set('after', opts.after)
 
-  // Pass search to WP for server-side pre-filtering (reduces data transferred).
-  // We'll still apply a stricter client-side filter below to fix WP's broad full-body matching.
-  if (opts.searchString?.trim()) params.set('search', opts.searchString.trim())
+  // Do NOT pass searchString to WP: WP search is not accent-insensitive and matches
+  // full post body (too broad). All text filtering is done client-side below.
 
   const res = await fetch(`${WP_API_BASE}/posts?${params}`, {
     headers: { 'User-Agent': 'ConcursosCGEBot/1.0 (+https://puntoindigo.com)' },

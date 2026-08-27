@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
   let after: string | undefined
   if (afterDays > 0) {
     const d = new Date()
-    d.setDate(d.getDate() - afterDays)
+    // afterDays=1 means "today only" → subtract 0 days (today midnight)
+    // afterDays=7 means "last 7 days" → subtract 7 days
+    const daysBack = afterDays === 1 ? 0 : afterDays
+    d.setDate(d.getDate() - daysBack)
     d.setHours(0, 0, 0, 0)
     after = d.toISOString()
   }
