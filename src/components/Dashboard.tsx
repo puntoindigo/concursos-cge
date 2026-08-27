@@ -220,8 +220,11 @@ export default function Dashboard({
   }, [])
 
   // Debounced fetch when filters change — resets to page 1
+  // Clear results immediately so stale data never shows while new fetch is in-flight.
   useEffect(() => {
     setPage(1)
+    setPosts([])
+    setLoading(true)
     if (fetchTimer.current) clearTimeout(fetchTimer.current)
     fetchTimer.current = setTimeout(() => fetchPosts(cfg, 1, afterDays), 150)
     return () => { if (fetchTimer.current) clearTimeout(fetchTimer.current) }
