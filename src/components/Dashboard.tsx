@@ -114,6 +114,7 @@ export default function Dashboard({
   const [botRunning, setBotRunning] = useState(false)
   const [botMsg, setBotMsg] = useState<string | null>(null)
   const [tab, setTab] = useState<'results' | 'settings'>('results')
+  const [afterDays, setAfterDays] = useState(0)
   const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Fire login notification once per browser session
@@ -129,7 +130,7 @@ export default function Dashboard({
     }).catch(() => {})
   }, [user.email, user.name])
 
-  const fetchPosts = useCallback(async (c: Config, p: number) => {
+  const fetchPosts = useCallback(async (c: Config, p: number, days: number) => {
     if (!c.categoryDepts.length && !c.categoryLevels.length) {
       setPosts([])
       setTotal(0)
@@ -142,6 +143,7 @@ export default function Dashboard({
         levels: c.categoryLevels.join(','),
         search: c.searchString,
         page: String(p),
+        afterDays: String(days),
       })
       const res = await fetch(`/api/posts?${sp}`)
       const data = await res.json()
@@ -158,18 +160,18 @@ export default function Dashboard({
     }
   }, [])
 
-  // Debounced fetch when config changes
+  // Debounced fetch when filters change
   useEffect(() => {
     setPage(1)
     if (fetchTimer.current) clearTimeout(fetchTimer.current)
-    fetchTimer.current = setTimeout(() => fetchPosts(cfg, 1), 500)
+    fetchTimer.current = setTimeout(() => fetchPosts(cfg, 1, afterDays), 500)
     return () => { if (fetchTimer.current) clearTimeout(fetchTimer.current) }
-  }, [cfg.categoryDepts, cfg.categoryLevels, cfg.searchString, fetchPosts])
+  }, [cfg.categoryDepts, cfg.categoryLevels, cfg.searchString, afterDays, fetchPosts])
 
   // Load more
   useEffect(() => {
-    if (page > 1) fetchPosts(cfg, page)
-  }, [page, fetchPosts, cfg])
+    if (page > 1) fetchPosts(cfg, page, afterDays)
+  }, [page, fetchPosts, cfg, afterDays])
 
   function toggleDept(id: number) {
     setCfg((c) => ({
@@ -316,7 +318,7 @@ export default function Dashboard({
             </div>
 
             {/* Search */}
-            <div>
+            <div className="mb-5">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Buscar en título</p>
               <input
                 type="text"
@@ -325,6 +327,22 @@ export default function Dashboard({
                 onChange={(e) => setCfg((c) => ({ ...c, searchString: e.target.value }))}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
+            </div>
+
+            {/* Date range */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Fecha desde</p>
+              <select
+                value={afterDays}
+                onChange={(e) => setAfterDays(Number(e.target.value))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+              >
+                <option value={0}>Todos</option>
+                <option value={1}>Hoy</option>
+                <option value={7}>Últimos 7 días</option>
+                <option value={15}>Últimos 15 días</option>
+                <option value={30}>Últimos 30 días</option>
+              </select>
             </div>
           </div>
 

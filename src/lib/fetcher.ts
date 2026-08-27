@@ -13,7 +13,7 @@ export interface FetchOptions {
   categoryDepts: number[]
   categoryLevels: number[]
   searchString?: string
-  after?: string
+  after?: string        // ISO date — only posts newer than this
   perPage?: number
   page?: number
 }
@@ -25,7 +25,6 @@ export interface FetchResult {
 }
 
 export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
-  // Ask API for posts in any of the selected categories (OR behavior from WP side)
   const allCats = [...opts.categoryDepts, ...opts.categoryLevels]
   if (!allCats.length) return { posts: [], total: 0, totalPages: 0 }
 
@@ -37,7 +36,11 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
     order: 'desc',
     _fields: 'id,date,title,link,excerpt,categories',
   })
+
   if (opts.after) params.set('after', opts.after)
+
+  // Pass search to WP for server-side pre-filtering (reduces data transferred).
+  // We'll still apply a stricter client-side filter below to fix WP's broad full-body matching.
   if (opts.searchString?.trim()) params.set('search', opts.searchString.trim())
 
   const res = await fetch(`${WP_API_BASE}/posts?${params}`, {
@@ -54,7 +57,8 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
   const totalPages = parseInt(res.headers.get('X-WP-TotalPages') ?? '1')
   let posts: WpPost[] = await res.json()
 
-  // Client-side AND filter: post must belong to at least one dept AND at least one level
+  // ── Category AND filter (client-side) ───────────────────────────────────────
+  // WP API `categories` is OR; we enforce AND: post must have ≥1 dept AND ≥1 level.
   if (opts.categoryDepts.length && opts.categoryLevels.length) {
     posts = posts.filter(
       (p) =>
@@ -67,7 +71,24 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
     posts = posts.filter((p) => opts.categoryLevels.some((id) => p.categories.includes(id)))
   }
 
+  // ── Search string filter (client-side) ───────────────────────────────────────
+  // WP `search` matches against the full post body which users can't see.
+  // We guarantee the term appears in the visible title OR excerpt only.
+  if (opts.searchString?.trim()) {
+    const term = removeAccents(opts.searchString.trim().toLowerCase())
+    posts = posts.filter((p) => {
+      const title = removeAccents(decodeHtml(p.title.rendered).toLowerCase())
+      const excerpt = removeAccents(decodeHtml(p.excerpt.rendered).toLowerCase())
+      return title.includes(term) || excerpt.includes(term)
+    })
+  }
+
   return { posts, total, totalPages }
+}
+
+/** Normalize accented characters so "física" matches "fisica". */
+function removeAccents(str: string): string {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
 export function decodeHtml(html: string): string {
