@@ -727,7 +727,7 @@ export default function Dashboard({
               Cancelar
             </button>
             <a
-              href="https://accounts.puntoindigo.com/api/auth/logout"
+              href={`https://accounts.puntoindigo.com/api/auth/logout?next=${encodeURIComponent('https://concursos-cge.puntoindigo.com')}`}
               className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-semibold text-white text-center transition-colors"
             >
               Cerrar sesión
