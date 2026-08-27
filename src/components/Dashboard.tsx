@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { DEPARTMENTS, LEVELS, CATEGORY_NAME } from '@/lib/categories'
 
+interface User {
+  email: string
+  name: string
+  picture: string
+}
+
 interface WpPost {
   id: number
   date: string
@@ -78,9 +84,11 @@ function cronToHumanART(cron: string): string {
 }
 
 export default function Dashboard({
+  user,
   initialConfig,
   initialState,
 }: {
+  user: User
   initialConfig: Config | null
   initialState: AppState | null
 }) {
@@ -105,6 +113,19 @@ export default function Dashboard({
   const [botMsg, setBotMsg] = useState<string | null>(null)
   const [tab, setTab] = useState<'results' | 'settings'>('results')
   const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Fire login notification once per browser session
+  useEffect(() => {
+    if (!user.email) return
+    const key = `cge_notified_${user.email}`
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+    fetch('/api/auth/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email, name: user.name }),
+    }).catch(() => {})
+  }, [user.email, user.name])
 
   const fetchPosts = useCallback(async (c: Config, p: number) => {
     if (!c.categoryDepts.length && !c.categoryLevels.length) {
@@ -222,12 +243,26 @@ export default function Dashboard({
           </p>
           <h1 className="text-white text-xl font-bold leading-tight">Monitor de Concursos Docentes</h1>
         </div>
-        <div className="text-right text-xs text-indigo-200 hidden sm:block">
-          {appState?.lastRunAt && (
-            <div>Último chequeo: {formatDate(appState.lastRunAt)}</div>
-          )}
-          {appState?.lastFoundCount != null && (
-            <div>Encontrados en último run: {appState.lastFoundCount}</div>
+        <div className="flex items-center gap-4">
+          <div className="text-right text-xs text-indigo-200 hidden sm:block">
+            {appState?.lastRunAt && (
+              <div>Último chequeo: {formatDate(appState.lastRunAt)}</div>
+            )}
+            {appState?.lastFoundCount != null && (
+              <div>Encontrados en último run: {appState.lastFoundCount}</div>
+            )}
+          </div>
+          {user.email && (
+            <div className="flex items-center gap-2">
+              {user.picture ? (
+                <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border-2 border-indigo-400" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold">
+                  {user.name?.[0]?.toUpperCase() ?? user.email[0]?.toUpperCase()}
+                </div>
+              )}
+              <span className="text-indigo-200 text-xs hidden md:block">{user.name || user.email}</span>
+            </div>
           )}
         </div>
       </header>

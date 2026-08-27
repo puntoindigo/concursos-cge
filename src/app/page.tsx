@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { getDb } from '@/db'
 import { config as configTable, state as stateTable } from '@/db/schema'
 import Dashboard from '@/components/Dashboard'
@@ -7,6 +8,14 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   let initialConfig = null
   let initialState = null
+
+  // User set by middleware via headers
+  const hdrs = await headers()
+  const user = {
+    email: hdrs.get('x-pi-email') ?? '',
+    name:  hdrs.get('x-pi-name') ?? '',
+    picture: hdrs.get('x-pi-picture') ?? '',
+  }
 
   try {
     const db = getDb()
@@ -26,6 +35,7 @@ export default async function Home() {
 
   return (
     <Dashboard
+      user={user}
       initialConfig={
         initialConfig
           ? {
