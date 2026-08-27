@@ -106,7 +106,6 @@ export default function Dashboard({
   const [cfg, setCfg] = useState<Config>(initialConfig ?? defaultConfig)
   const [appState, setAppState] = useState<AppState | null>(initialState)
   const [posts, setPosts] = useState<WpPost[]>([])
-  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [saving, setSaving] = useState(false)
@@ -115,6 +114,7 @@ export default function Dashboard({
   const [botMsg, setBotMsg] = useState<string | null>(null)
   const [tab, setTab] = useState<'results' | 'settings'>('results')
   const [afterDays, setAfterDays] = useState(0)
+  const [wpTotalPages, setWpTotalPages] = useState(1)
   const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Fire login notification once per browser session
@@ -133,7 +133,7 @@ export default function Dashboard({
   const fetchPosts = useCallback(async (c: Config, p: number, days: number) => {
     if (!c.categoryDepts.length && !c.categoryLevels.length) {
       setPosts([])
-      setTotal(0)
+      setWpTotalPages(1)
       return
     }
     setLoading(true)
@@ -152,7 +152,7 @@ export default function Dashboard({
       } else {
         setPosts((prev) => [...prev, ...(data.posts ?? [])])
       }
-      setTotal(data.total ?? 0)
+      setWpTotalPages(data.totalPages ?? 1)
     } catch {
       // ignore
     } finally {
@@ -439,7 +439,9 @@ export default function Dashboard({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-gray-800">
-                {loading ? 'Cargando…' : `${total.toLocaleString('es-AR')} concurso${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
+                {loading && posts.length === 0
+                  ? 'Cargando…'
+                  : `${posts.length.toLocaleString('es-AR')} concurso${posts.length !== 1 ? 's' : ''} encontrado${posts.length !== 1 ? 's' : ''}`}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
                 {cfg.categoryDepts.map((id) => CATEGORY_NAME[id]).join(', ')}
@@ -512,13 +514,13 @@ export default function Dashboard({
                 )
               })}
 
-              {posts.length < total && (
+              {page < wpTotalPages && (
                 <button
                   onClick={() => setPage((p) => p + 1)}
                   disabled={loading}
                   className="w-full py-3 text-sm font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 rounded-xl transition-colors bg-white"
                 >
-                  {loading ? 'Cargando…' : `Cargar más (${total - posts.length} restantes)`}
+                  {loading ? 'Buscando…' : 'Ver más resultados'}
                 </button>
               )}
             </div>

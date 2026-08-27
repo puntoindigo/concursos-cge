@@ -83,7 +83,8 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
     })
   }
 
-  return { posts, total, totalPages }
+  // total = filtered count (not WP body-match total, which is misleading)
+  return { posts, total: posts.length, totalPages }
 }
 
 /** Normalize accented characters so "física" matches "fisica". */
