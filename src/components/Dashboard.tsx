@@ -112,9 +112,11 @@ export default function Dashboard({
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [botRunning, setBotRunning] = useState(false)
   const [botMsg, setBotMsg] = useState<string | null>(null)
-  const [tab, setTab] = useState<'results' | 'settings'>('results')
   const [afterDays, setAfterDays] = useState(0)
   const [wpTotalPages, setWpTotalPages] = useState(1)
+  const [selectedPost, setSelectedPost] = useState<WpPost | null>(null)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
   const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Fire login notification once per browser session
@@ -164,7 +166,7 @@ export default function Dashboard({
   useEffect(() => {
     setPage(1)
     if (fetchTimer.current) clearTimeout(fetchTimer.current)
-    fetchTimer.current = setTimeout(() => fetchPosts(cfg, 1, afterDays), 500)
+    fetchTimer.current = setTimeout(() => fetchPosts(cfg, 1, afterDays), 150)
     return () => { if (fetchTimer.current) clearTimeout(fetchTimer.current) }
   }, [cfg.categoryDepts, cfg.categoryLevels, cfg.searchString, afterDays, fetchPosts])
 
@@ -319,7 +321,7 @@ export default function Dashboard({
 
             {/* Search */}
             <div className="mb-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Buscar en título</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Buscar en título o contenido</p>
               <input
                 type="text"
                 placeholder="ej: maestro, cátedra..."
@@ -346,91 +348,105 @@ export default function Dashboard({
             </div>
           </div>
 
-          {/* Config section */}
-          <div className="p-5 border-b border-gray-100">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Alerta por email</h2>
-
-            <div className="mb-3">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Enviar a
-              </label>
-              <input
-                type="email"
-                placeholder="destino@ejemplo.com"
-                value={cfg.emailTo}
-                onChange={(e) => setCfg((c) => ({ ...c, emailTo: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Horario (cron UTC)
-              </label>
-              <input
-                type="text"
-                value={cfg.scheduleCron}
-                onChange={(e) => setCfg((c) => ({ ...c, scheduleCron: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              />
-              <p className="text-xs text-indigo-600 mt-1">{cronToHumanART(cfg.scheduleCron)}</p>
-            </div>
-
-            <div className="flex items-center gap-2 mb-4">
-              <input
-                type="checkbox"
-                id="isActive"
-                checked={cfg.isActive}
-                onChange={(e) => setCfg((c) => ({ ...c, isActive: e.target.checked }))}
-                className="w-4 h-4 rounded accent-indigo-600"
-              />
-              <label htmlFor="isActive" className="text-sm text-gray-700">Bot activo</label>
-            </div>
-
+          {/* Alertas por email — collapsible */}
+          <div className="border-b border-gray-100">
             <button
-              onClick={saveConfig}
-              disabled={saving}
-              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+              onClick={() => setEmailOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
             >
-              {saving ? 'Guardando…' : 'Guardar configuración'}
+              <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Alerta por email</span>
+              <span className="text-gray-400 text-sm">{emailOpen ? '▲' : '▼'}</span>
             </button>
-            {saveMsg && (
-              <p className={`text-xs mt-2 text-center font-medium ${saveMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
-                {saveMsg}
-              </p>
+            {emailOpen && (
+              <div className="px-5 pb-5">
+                <div className="mb-3">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                    Enviar a
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="destino@ejemplo.com"
+                    value={cfg.emailTo}
+                    onChange={(e) => setCfg((c) => ({ ...c, emailTo: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                    Horario (cron UTC)
+                  </label>
+                  <input
+                    type="text"
+                    value={cfg.scheduleCron}
+                    onChange={(e) => setCfg((c) => ({ ...c, scheduleCron: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  />
+                  <p className="text-xs text-indigo-600 mt-1">{cronToHumanART(cfg.scheduleCron)}</p>
+                </div>
+                <div className="flex items-center gap-2 mb-4">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={cfg.isActive}
+                    onChange={(e) => setCfg((c) => ({ ...c, isActive: e.target.checked }))}
+                    className="w-4 h-4 rounded accent-indigo-600"
+                  />
+                  <label htmlFor="isActive" className="text-sm text-gray-700">Bot activo</label>
+                </div>
+                <button
+                  onClick={saveConfig}
+                  disabled={saving}
+                  className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  {saving ? 'Guardando…' : 'Guardar configuración'}
+                </button>
+                {saveMsg && (
+                  <p className={`text-xs mt-2 text-center font-medium ${saveMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
+                    {saveMsg}
+                  </p>
+                )}
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                  <button
+                    onClick={() => runBotNow(false)}
+                    disabled={botRunning}
+                    className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    {botRunning ? 'Ejecutando…' : '▶ Buscar nuevos ahora'}
+                  </button>
+                  <button
+                    onClick={() => runBotNow(true)}
+                    disabled={botRunning || !cfg.emailTo}
+                    className="w-full py-2 px-4 border border-indigo-300 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Enviar prueba por email
+                  </button>
+                  {botMsg && (
+                    <p className={`text-xs text-center font-medium ${botMsg.startsWith('Error') ? 'text-red-500' : 'text-green-600'}`}>
+                      {botMsg}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Invite panel — superadmin only */}
+          {/* Invite panel — superadmin only, collapsible */}
           {user.isSuperadmin && (
-            <div className="border-t border-gray-100">
-              <InvitePanel />
+            <div className="border-b border-gray-100">
+              <button
+                onClick={() => setInviteOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Accesos invitados</span>
+                <span className="text-gray-400 text-sm">{inviteOpen ? '▲' : '▼'}</span>
+              </button>
+              {inviteOpen && (
+                <div className="px-0 pb-2">
+                  <InvitePanel />
+                </div>
+              )}
             </div>
           )}
-
-          {/* Bot actions */}
-          <div className="p-5 border-t border-gray-100">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Acciones</h2>
-            <button
-              onClick={() => runBotNow(false)}
-              disabled={botRunning}
-              className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors mb-2"
-            >
-              {botRunning ? 'Ejecutando…' : '▶ Buscar nuevos'}
-            </button>
-            <button
-              onClick={() => runBotNow(true)}
-              disabled={botRunning || !cfg.emailTo}
-              className="w-full py-2 px-4 border border-indigo-300 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 text-sm font-semibold rounded-lg transition-colors"
-            >
-              📧 Enviar prueba ahora
-            </button>
-            {botMsg && (
-              <p className={`text-xs mt-2 text-center font-medium ${botMsg.startsWith('Error') ? 'text-red-500' : 'text-green-600'}`}>
-                {botMsg}
-              </p>
-            )}
-          </div>
         </aside>
 
         {/* Main content */}
@@ -470,7 +486,8 @@ export default function Dashboard({
                 return (
                   <article
                     key={post.id}
-                    className="bg-white rounded-xl border border-gray-100 p-4 hover:border-indigo-200 hover:shadow-sm transition-all group"
+                    onClick={() => setSelectedPost(post)}
+                    className="bg-white rounded-xl border border-gray-100 p-4 hover:border-indigo-300 hover:shadow-md transition-all group cursor-pointer"
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
@@ -486,27 +503,17 @@ export default function Dashboard({
                             </span>
                           ))}
                         </div>
-                        <a
-                          href={post.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-gray-800 font-semibold text-sm leading-snug hover:text-indigo-600 transition-colors block mb-1.5"
-                        >
+                        <p className="text-gray-800 font-semibold text-sm leading-snug mb-1.5 group-hover:text-indigo-700 transition-colors">
                           {title}
-                        </a>
+                        </p>
                         {excerpt && (
                           <p className="text-gray-500 text-xs leading-relaxed mb-2 line-clamp-2">{excerpt}</p>
                         )}
                         <div className="flex items-center justify-between">
                           <span className="text-gray-400 text-xs">{formatDateShort(post.date)}</span>
-                          <a
-                            href={post.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-indigo-600 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            Ver concurso →
-                          </a>
+                          <span className="text-indigo-500 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                            Ver detalle →
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -538,6 +545,71 @@ export default function Dashboard({
           {' '}· Monitor de Concursos CGE Entre Ríos
         </p>
       </footer>
+
+      {/* Post modal */}
+      {selectedPost && (() => {
+        const { levels, depts } = levelBadge(selectedPost.categories)
+        const title = decodeHtml(selectedPost.title.rendered)
+        const excerpt = decodeHtml(selectedPost.excerpt.rendered)
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setSelectedPost(null)}
+          >
+            <div
+              className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {depts.map((id) => (
+                      <span key={id} className="inline-block bg-gray-100 text-gray-600 text-xs font-medium px-2 py-0.5 rounded-full">
+                        {CATEGORY_NAME[id]}
+                      </span>
+                    ))}
+                    {levels.map((id) => (
+                      <span key={id} className="inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                        {CATEGORY_NAME[id]}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setSelectedPost(null)}
+                    className="text-gray-400 hover:text-gray-700 text-2xl leading-none flex-shrink-0 transition-colors"
+                    aria-label="Cerrar"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Title */}
+                <h2 className="text-lg font-bold text-gray-900 leading-snug mb-2">{title}</h2>
+                <p className="text-xs text-gray-400 mb-5">{formatDate(selectedPost.date)}</p>
+
+                {/* Excerpt */}
+                {excerpt && (
+                  <div className="text-sm text-gray-700 leading-relaxed bg-gray-50 rounded-xl p-4 mb-6 whitespace-pre-line">
+                    {excerpt}
+                  </div>
+                )}
+
+                {/* CTA */}
+                <a
+                  href={selectedPost.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-semibold text-sm transition-colors"
+                >
+                  Ver concurso completo en CGE →
+                </a>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
