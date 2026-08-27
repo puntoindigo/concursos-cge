@@ -24,3 +24,21 @@ body {
   margin: 0;
   min-height: 100vh;
 }
+
+/* WP post full content styling */
+.wp-content p { margin-bottom: 0.9em; line-height: 1.7; }
+.wp-content h1,.wp-content h2,.wp-content h3,.wp-content h4 {
+  font-weight: 700; margin: 1.2em 0 0.4em; color: #111827;
+}
+.wp-content h2 { font-size: 1.1rem; }
+.wp-content h3 { font-size: 1rem; }
+.wp-content ul,.wp-content ol { padding-left: 1.4em; margin-bottom: 0.9em; }
+.wp-content li { margin-bottom: 0.3em; }
+.wp-content strong { font-weight: 600; }
+.wp-content em { font-style: italic; }
+.wp-content a { color: #4f46e5; text-decoration: underline; }
+.wp-content table { width: 100%; border-collapse: collapse; margin-bottom: 1em; font-size: 0.85rem; }
+.wp-content th,.wp-content td { border: 1px solid #e5e7eb; padding: 0.4em 0.7em; text-align: left; }
+.wp-content th { background: #f9fafb; font-weight: 600; }
+.wp-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.2em 0; }
+.wp-content figure,.wp-content img { max-width: 100%; height: auto; }

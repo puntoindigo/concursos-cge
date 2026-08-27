@@ -57,6 +57,13 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
   const totalPages = parseInt(res.headers.get('X-WP-TotalPages') ?? '1')
   let posts: WpPost[] = await res.json()
 
+  // ── Date filter (client-side safety net) ────────────────────────────────────
+  // WP may silently ignore `after` when combined with `search`, so we enforce it ourselves.
+  if (opts.after) {
+    const afterDate = new Date(opts.after)
+    posts = posts.filter((p) => new Date(p.date) > afterDate)
+  }
+
   // ── Category AND filter (client-side) ───────────────────────────────────────
   // WP API `categories` is OR; we enforce AND: post must have ≥1 dept AND ≥1 level.
   if (opts.categoryDepts.length && opts.categoryLevels.length) {
