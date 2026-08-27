@@ -103,7 +103,11 @@ export default function Dashboard({
     isActive: true,
   }
 
-  const [cfg, setCfg] = useState<Config>(initialConfig ?? defaultConfig)
+  // searchString always starts empty (not restored from DB) to avoid stale searches on reload
+  const [cfg, setCfg] = useState<Config>({
+    ...(initialConfig ?? defaultConfig),
+    searchString: '',
+  })
   const [appState, setAppState] = useState<AppState | null>(initialState)
   const [posts, setPosts] = useState<WpPost[]>([])
   const [loading, setLoading] = useState(false)
@@ -117,6 +121,8 @@ export default function Dashboard({
   const [selectedPost, setSelectedPost] = useState<WpPost | null>(null)
   const [emailOpen, setEmailOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [deptOpen, setDeptOpen] = useState(true)
+  const [levelOpen, setLevelOpen] = useState(true)
   const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Fire login notification once per browser session
@@ -279,44 +285,78 @@ export default function Dashboard({
           <div className="p-5 border-b border-gray-100">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Filtros</h2>
 
-            {/* Departments */}
-            <div className="mb-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Departamento</p>
-              <div className="space-y-1.5">
-                {DEPARTMENTS.map((d) => (
-                  <label key={d.id} className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={cfg.categoryDepts.includes(d.id)}
-                      onChange={() => toggleDept(d.id)}
-                      className="w-4 h-4 rounded border-gray-300 accent-indigo-600"
-                    />
-                    <span className="text-sm text-gray-700 group-hover:text-indigo-600 transition-colors">
-                      {d.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
+            {/* Departments — collapsible */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setDeptOpen((v) => !v)}
+                className="w-full flex items-center justify-between mb-2 group"
+              >
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Departamento</span>
+                <span className="text-gray-400 text-xs">{deptOpen ? '▲' : '▼'}</span>
+              </button>
+              {!deptOpen && cfg.categoryDepts.length > 0 && (
+                <p className="text-xs text-indigo-600 font-medium truncate mb-1">
+                  {cfg.categoryDepts.map((id) => CATEGORY_NAME[id]).join(', ')}
+                </p>
+              )}
+              {!deptOpen && cfg.categoryDepts.length === 0 && (
+                <p className="text-xs text-gray-400 italic mb-1">Ninguno</p>
+              )}
+              {deptOpen && (
+                <div className="space-y-1.5">
+                  {DEPARTMENTS.map((d) => (
+                    <label key={d.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={cfg.categoryDepts.includes(d.id)}
+                        onChange={() => toggleDept(d.id)}
+                        className="w-4 h-4 rounded border-gray-300 accent-indigo-600"
+                      />
+                      <span className="text-sm text-gray-700 group-hover:text-indigo-600 transition-colors">
+                        {d.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Levels */}
+            {/* Levels — collapsible */}
             <div className="mb-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nivel educativo</p>
-              <div className="space-y-1.5">
-                {LEVELS.map((l) => (
-                  <label key={l.id} className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={cfg.categoryLevels.includes(l.id)}
-                      onChange={() => toggleLevel(l.id)}
-                      className="w-4 h-4 rounded border-gray-300 accent-indigo-600"
-                    />
-                    <span className="text-sm text-gray-700 group-hover:text-indigo-600 transition-colors">
-                      {l.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setLevelOpen((v) => !v)}
+                className="w-full flex items-center justify-between mb-2 group"
+              >
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nivel educativo</span>
+                <span className="text-gray-400 text-xs">{levelOpen ? '▲' : '▼'}</span>
+              </button>
+              {!levelOpen && cfg.categoryLevels.length > 0 && (
+                <p className="text-xs text-indigo-600 font-medium truncate mb-1">
+                  {cfg.categoryLevels.map((id) => CATEGORY_NAME[id]).join(', ')}
+                </p>
+              )}
+              {!levelOpen && cfg.categoryLevels.length === 0 && (
+                <p className="text-xs text-gray-400 italic mb-1">Ninguno</p>
+              )}
+              {levelOpen && (
+                <div className="space-y-1.5">
+                  {LEVELS.map((l) => (
+                    <label key={l.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={cfg.categoryLevels.includes(l.id)}
+                        onChange={() => toggleLevel(l.id)}
+                        className="w-4 h-4 rounded border-gray-300 accent-indigo-600"
+                      />
+                      <span className="text-sm text-gray-700 group-hover:text-indigo-600 transition-colors">
+                        {l.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Search */}

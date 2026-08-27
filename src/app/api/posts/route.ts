@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchConcursos } from '@/lib/fetcher'
+import { fetchConcursos, type WpPost } from '@/lib/fetcher'
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
@@ -9,7 +9,6 @@ export async function GET(req: NextRequest) {
   const page = parseInt(sp.get('page') ?? '1')
   const afterDays = parseInt(sp.get('afterDays') ?? '0')
 
-  // Convert days to ISO date string for the WP API `after` parameter
   let after: string | undefined
   if (afterDays > 0) {
     const d = new Date()
@@ -18,15 +17,31 @@ export async function GET(req: NextRequest) {
     after = d.toISOString()
   }
 
+  const baseOpts = { categoryDepts: depts, categoryLevels: levels, searchString: search, after, perPage: 30 }
+
   try {
-    const result = await fetchConcursos({
-      categoryDepts: depts,
-      categoryLevels: levels,
-      searchString: search,
-      after,
-      perPage: 30,
-      page,
-    })
+    // When search string is active, collect ALL title/excerpt matches across WP pages.
+    // WP's own `search` param matches full post body (too broad), so we paginate WP
+    // server-side and our client-side filter in fetcher.ts keeps only title/excerpt hits.
+    if (search.trim()) {
+      const firstResult = await fetchConcursos({ ...baseOpts, page: 1 })
+      const allPosts: WpPost[] = [...firstResult.posts]
+
+      const wpPages = Math.min(firstResult.totalPages, 6) // cap at 6 WP pages
+      if (wpPages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: wpPages - 1 }, (_, i) =>
+            fetchConcursos({ ...baseOpts, page: i + 2 })
+          )
+        )
+        rest.forEach((r) => allPosts.push(...r.posts))
+      }
+
+      return NextResponse.json({ posts: allPosts, total: allPosts.length, totalPages: 1 })
+    }
+
+    // No search: normal single-page fetch with client-controlled pagination
+    const result = await fetchConcursos({ ...baseOpts, page })
     return NextResponse.json(result)
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
