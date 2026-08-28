@@ -80,12 +80,18 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
   // ── Search string filter (client-side) ───────────────────────────────────────
   // WP `search` matches against the full post body which users can't see.
   // We guarantee the term appears in the visible title OR excerpt only.
+  // Tokenize by word so combined "educación física FISICA" doesn't become
+  // an unsatisfiable literal phrase — each word must appear independently.
   if (opts.searchString?.trim()) {
-    const term = removeAccents(opts.searchString.trim().toLowerCase())
+    const tokens = removeAccents(opts.searchString.trim().toLowerCase())
+      .split(/\s+/)
+      .filter(Boolean)
     posts = posts.filter((p) => {
-      const title = removeAccents(decodeHtml(p.title.rendered).toLowerCase())
-      const excerpt = removeAccents(decodeHtml(p.excerpt.rendered).toLowerCase())
-      return title.includes(term) || excerpt.includes(term)
+      const haystack =
+        removeAccents(decodeHtml(p.title.rendered).toLowerCase()) +
+        ' ' +
+        removeAccents(decodeHtml(p.excerpt.rendered).toLowerCase())
+      return tokens.every((tok) => haystack.includes(tok))
     })
   }
 
