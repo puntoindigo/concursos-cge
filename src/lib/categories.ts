@@ -24,3 +24,15 @@ export const LEVELS = [
 export const CATEGORY_NAME: Record<number, string> = Object.fromEntries(
   [...DEPARTMENTS, ...LEVELS].map((c) => [c.id, c.name])
 )
+
+// Quick-search shortcuts by discipline area.
+// WP Dirección categories do NOT tag concurso posts — the area info lives in
+// post titles only. These map a readable label to the search term that finds them.
+export const AREAS = [
+  { id: 'ef',    name: 'Educación Física',    term: 'educación física' },
+  { id: 'tec',   name: 'Técnica',             term: 'técnica' },
+  { id: 'arte',  name: 'Arte / Música',       term: 'artística' },
+  { id: 'esp',   name: 'Educación Especial',  term: 'especial' },
+  { id: 'adult', name: 'Jóvenes y Adultos',   term: 'adultos' },
+  { id: 'priv',  name: 'Privada',             term: 'privada' },
+]

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { DEPARTMENTS, LEVELS, CATEGORY_NAME } from '@/lib/categories'
+import { DEPARTMENTS, LEVELS, AREAS, CATEGORY_NAME } from '@/lib/categories'
 import InvitePanel from './InvitePanel'
 
 interface User {
@@ -132,6 +132,9 @@ export default function Dashboard({
   const [afterDays, setAfterDays] = useState(0)
   const [deptOpen, setDeptOpen] = useState(true)
   const [levelOpen, setLevelOpen] = useState(true)
+  const [areaOpen, setAreaOpen] = useState(true)
+  const [areaFilter, setAreaFilter] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Settings state
   const [saving, setSaving] = useState(false)
@@ -226,9 +229,10 @@ export default function Dashboard({
     setPosts([])
     setLoading(true)
     if (fetchTimer.current) clearTimeout(fetchTimer.current)
-    fetchTimer.current = setTimeout(() => fetchPosts(cfg, 1, afterDays), 150)
+    const combined = [areaFilter, cfg.searchString].filter(Boolean).join(' ').trim()
+    fetchTimer.current = setTimeout(() => fetchPosts({ ...cfg, searchString: combined }, 1, afterDays), 150)
     return () => { if (fetchTimer.current) clearTimeout(fetchTimer.current) }
-  }, [cfg.categoryDepts, cfg.categoryLevels, cfg.searchString, afterDays, fetchPosts])
+  }, [cfg.categoryDepts, cfg.categoryLevels, cfg.searchString, areaFilter, afterDays, fetchPosts])
   // NOTE: no separate useEffect for load-more — it's handled directly in the button click
   // to avoid race conditions when filters change while page > 1.
 
@@ -321,11 +325,24 @@ export default function Dashboard({
       {/* ── Header ─────────────────────────────────────────────── */}
       <header style={{ background: 'linear-gradient(135deg,#4338ca 0%,#6366f1 100%)' }}
         className="px-6 py-4 flex items-center justify-between">
-        <div>
-          <p className="text-indigo-200 text-xs font-semibold uppercase tracking-widest mb-0.5">
-            Consejo General de Educación · Entre Ríos
-          </p>
-          <h1 className="text-white text-xl font-bold leading-tight">Monitor de Concursos Docentes</h1>
+        <div className="flex items-center gap-3">
+          <button
+            className="md:hidden p-1.5 rounded-lg text-indigo-200 hover:text-white hover:bg-indigo-700/50 transition-colors"
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label="Filtros"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <rect y="3" width="20" height="2" rx="1" />
+              <rect y="9" width="20" height="2" rx="1" />
+              <rect y="15" width="20" height="2" rx="1" />
+            </svg>
+          </button>
+          <div>
+            <p className="text-indigo-200 text-xs font-semibold uppercase tracking-widest mb-0.5">
+              Consejo General de Educación · Entre Ríos
+            </p>
+            <h1 className="text-white text-xl font-bold leading-tight">Monitor de Concursos Docentes</h1>
+          </div>
         </div>
 
         {/* User menu */}
@@ -386,10 +403,32 @@ export default function Dashboard({
       {/* ── Layout ─────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar — filters only */}
-        <aside className="w-64 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+        <aside className={`
+          fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col overflow-y-auto
+          transition-transform duration-200
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:relative md:inset-y-auto md:left-auto md:translate-x-0 md:z-auto md:flex-shrink-0
+        `}>
           <div className="p-5">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Filtros</h2>
+            {/* Mobile close button */}
+            <div className="flex items-center justify-between mb-4 md:hidden">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400">Filtros</h2>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="text-gray-400 hover:text-gray-700 text-2xl leading-none transition-colors"
+                aria-label="Cerrar filtros"
+              >×</button>
+            </div>
+            <h2 className="hidden md:block text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Filtros</h2>
 
             {/* Departments — collapsible */}
             <div className="mb-4">
@@ -455,6 +494,39 @@ export default function Dashboard({
               )}
             </div>
 
+            {/* Area / Discipline — quick-search shortcuts */}
+            <div className="mb-4">
+              <button type="button"
+                onClick={() => setAreaOpen((v) => !v)}
+                className="w-full flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Área / Disciplina</span>
+                <span className="text-gray-400 text-xs">{areaOpen ? '▲' : '▼'}</span>
+              </button>
+              {!areaOpen && areaFilter && (
+                <p className="text-xs mb-1 text-indigo-600 font-medium">
+                  {AREAS.find((a) => a.term === areaFilter)?.name ?? areaFilter}
+                </p>
+              )}
+              {areaOpen && (
+                <div className="flex flex-wrap gap-1.5">
+                  {AREAS.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setAreaFilter((f) => (f === a.term ? '' : a.term))}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                        areaFilter === a.term
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'
+                      }`}
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Search */}
             <div className="mb-5">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
@@ -500,6 +572,7 @@ export default function Dashboard({
                 {cfg.categoryDepts.map((id) => CATEGORY_NAME[id]).join(', ')}
                 {cfg.categoryDepts.length && cfg.categoryLevels.length ? ' · ' : ''}
                 {cfg.categoryLevels.map((id) => CATEGORY_NAME[id]).join(', ')}
+                {areaFilter ? ` · ${AREAS.find((a) => a.term === areaFilter)?.name ?? areaFilter}` : ''}
                 {cfg.searchString ? ` · "${cfg.searchString}"` : ''}
               </p>
             </div>
@@ -546,7 +619,8 @@ export default function Dashboard({
                   onClick={() => {
                     const next = page + 1
                     setPage(next)
-                    fetchPosts(cfg, next, afterDays)
+                    const combined = [areaFilter, cfg.searchString].filter(Boolean).join(' ').trim()
+                    fetchPosts({ ...cfg, searchString: combined }, next, afterDays)
                   }}
                   disabled={loading}
                   className="w-full py-3 text-sm font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 rounded-xl transition-colors bg-white"
