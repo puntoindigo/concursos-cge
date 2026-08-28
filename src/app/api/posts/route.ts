@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     categoryLevels: levels,
     searchString: search,
     after,
-    perPage: 30,
+    perPage: 100,
   }
 
   try {
