@@ -5,11 +5,30 @@ import { and, gt, desc } from 'drizzle-orm'
 import { decodeHtml, removeAccents } from '@/lib/fetcher'
 import { getUser } from '@/lib/get-user'
 import { notifyError } from '@/lib/error-notify'
-import { runBot } from '@/lib/bot'
-
-export const maxDuration = 30
 
 const STALE_MS = 30 * 60 * 1000 // 30 minutes
+
+const GITHUB_REPO = 'puntoindigo/concursos-cge'
+const WORKFLOW_FILE = 'refresh-cache.yml'
+
+async function dispatchRefreshWorkflow() {
+  const token = process.env.GITHUB_PAT
+  if (!token) return
+  try {
+    await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main' }),
+      }
+    )
+  } catch {}
+}
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
@@ -44,7 +63,7 @@ export async function GET(req: NextRequest) {
     const lastRunAt = st?.lastRunAt
     const isStale = !lastRunAt || Date.now() - lastRunAt.getTime() > STALE_MS
     if (isStale) {
-      scheduleAfter(() => runBot(false).catch(() => {}))
+      scheduleAfter(() => dispatchRefreshWorkflow())
     }
 
     // Map to the WpPost shape the Dashboard expects
