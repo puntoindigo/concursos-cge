@@ -1,6 +1,7 @@
 import { getDb } from '@/db'
 import { config as configTable, state as stateTable } from '@/db/schema'
 import { getUser } from '@/lib/get-user'
+import { checkoutUrl } from '@/lib/plata'
 import Dashboard from '@/components/Dashboard'
 
 export const dynamic = 'force-dynamic'
@@ -19,20 +20,29 @@ export default async function Home() {
     const loginUrl = `https://accounts.puntoindigo.com/api/auth/signin-google?next=${encodeURIComponent(process.env.APP_URL ?? 'https://concursos-cge.puntoindigo.com')}`
 
     if (auth.reason === 'not_allowed') {
+      const payUrl = checkoutUrl()
       return (
         <div style={{ background: 'linear-gradient(135deg,#4338ca 0%,#6366f1 100%)', minHeight: '100vh' }}
           className="flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="px-8 py-10 text-center">
               <div className="text-4xl mb-4">🔒</div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Acceso no autorizado</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Acceso no disponible</h2>
               <p className="text-gray-500 text-sm mb-6">
-                Tu cuenta de Google no tiene acceso a esta aplicación. Contactá al administrador para solicitar acceso.
+                Tu cuenta de Google aún no tiene acceso al Monitor CGE. Podés adquirir acceso directamente.
               </p>
-              <a href="https://accounts.puntoindigo.com/api/auth/logout"
-                className="text-indigo-600 text-sm font-medium hover:underline">
-                Cerrar sesión
+              <a
+                href={payUrl}
+                className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-6 py-3 rounded-xl transition-colors mb-4"
+              >
+                Obtener acceso — USD 5
               </a>
+              <div>
+                <a href="https://accounts.puntoindigo.com/api/auth/logout"
+                  className="text-indigo-600 text-xs font-medium hover:underline">
+                  Cerrar sesión
+                </a>
+              </div>
             </div>
             <div className="bg-gray-50 border-t border-gray-100 py-3 px-8 text-center">
               <p className="text-xs text-gray-400">
