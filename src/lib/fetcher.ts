@@ -16,6 +16,7 @@ export interface FetchOptions {
   after?: string        // ISO date — only posts newer than this
   perPage?: number
   page?: number
+  timeoutMs?: number   // default 8000 for user routes, increase for background bot
 }
 
 export interface FetchResult {
@@ -43,7 +44,7 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
   // full post body (too broad). All text filtering is done client-side below.
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 8000)
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 8000)
   let res: Response
   try {
     res = await fetch(`${WP_API_BASE}/posts?${params}`, {

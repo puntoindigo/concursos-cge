@@ -1,10 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after as scheduleAfter } from 'next/server'
 import { getDb } from '@/db'
-import { cachedPosts } from '@/db/schema'
+import { cachedPosts, state as stateTable } from '@/db/schema'
 import { and, gt, desc } from 'drizzle-orm'
 import { decodeHtml, removeAccents } from '@/lib/fetcher'
 import { getUser } from '@/lib/get-user'
 import { notifyError } from '@/lib/error-notify'
+import { runBot } from '@/lib/bot'
+
+export const maxDuration = 30
+
+const STALE_MS = 30 * 60 * 1000 // 30 minutes
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
@@ -25,11 +30,22 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
 
-    const rows = await db
-      .select()
-      .from(cachedPosts)
-      .where(after ? and(gt(cachedPosts.date, after)) : undefined)
-      .orderBy(desc(cachedPosts.date))
+    // Read state and posts in parallel
+    const [rows, [st]] = await Promise.all([
+      db.select()
+        .from(cachedPosts)
+        .where(after ? and(gt(cachedPosts.date, after)) : undefined)
+        .orderBy(desc(cachedPosts.date)),
+      db.select().from(stateTable).limit(1),
+    ])
+
+    // Stale-while-revalidate: if cache hasn't been refreshed in 30 min (or is empty),
+    // trigger a background refresh — user still gets the current cached response immediately
+    const lastRunAt = st?.lastRunAt
+    const isStale = !lastRunAt || Date.now() - lastRunAt.getTime() > STALE_MS
+    if (isStale) {
+      scheduleAfter(() => runBot(false).catch(() => {}))
+    }
 
     // Map to the WpPost shape the Dashboard expects
     let posts = rows.map((r) => ({
@@ -41,7 +57,7 @@ export async function GET(req: NextRequest) {
       categories: r.categories as number[],
     }))
 
-    // Category AND filter (same logic as fetcher.ts)
+    // Category AND filter
     if (depts.length && levels.length) {
       posts = posts.filter(
         (p) =>
@@ -54,7 +70,7 @@ export async function GET(req: NextRequest) {
       posts = posts.filter((p) => levels.some((id) => p.categories.includes(id)))
     }
 
-    // Accent-insensitive text search across title + excerpt
+    // Accent-insensitive text search
     if (search.trim()) {
       const tokens = removeAccents(search.trim().toLowerCase()).split(/\s+/).filter(Boolean)
       posts = posts.filter((p) => {
@@ -66,7 +82,13 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ posts, total: posts.length, totalPages: 1 })
+    return NextResponse.json({
+      posts,
+      total: posts.length,
+      totalPages: 1,
+      lastRunAt: lastRunAt?.toISOString() ?? null,
+      isRefreshing: isStale,
+    })
   } catch (e) {
     let userEmail: string | undefined
     try {

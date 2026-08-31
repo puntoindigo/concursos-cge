@@ -127,6 +127,7 @@ export default function Dashboard({
   const [appState, setAppState] = useState<AppState | null>(initialState)
   const [posts, setPosts] = useState<WpPost[]>([])
   const [loading, setLoading] = useState(false)
+  const [cacheRefreshing, setCacheRefreshing] = useState(false)
   const [page, setPage] = useState(1)
   const [wpTotalPages, setWpTotalPages] = useState(1)
   const [afterDays, setAfterDays] = useState(0)
@@ -215,6 +216,7 @@ export default function Dashboard({
         setPosts((prev) => [...prev, ...(data.posts ?? [])])
       }
       setWpTotalPages(data.totalPages ?? 1)
+      setCacheRefreshing(data.isRefreshing === true)
     } catch {
       // ignore
     } finally {
@@ -574,15 +576,27 @@ export default function Dashboard({
                 {cfg.searchString ? ` · "${cfg.searchString}"` : ''}
               </p>
             </div>
-            {loading && (
-              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            )}
+            <div className="flex items-center gap-2">
+              {cacheRefreshing && !loading && (
+                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 border border-amber-500 border-t-transparent rounded-full animate-spin" />
+                  Actualizando…
+                </span>
+              )}
+              {loading && (
+                <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              )}
+            </div>
           </div>
 
           {posts.length === 0 && !loading ? (
             <div className="text-center py-20 text-gray-400">
-              <div className="text-4xl mb-3">🔍</div>
-              <p className="text-sm">No se encontraron concursos con los filtros actuales.</p>
+              <div className="text-4xl mb-3">{cacheRefreshing ? '🔄' : '🔍'}</div>
+              <p className="text-sm">
+                {cacheRefreshing
+                  ? 'Actualizando datos en segundo plano... Volvé en un momento.'
+                  : 'No se encontraron concursos con los filtros actuales.'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">

@@ -19,13 +19,14 @@ export async function runBot(forceEmailEvenIfEmpty = false): Promise<BotRunResul
 
   const [st] = await db.select().from(stateTable).limit(1)
 
-  // Fetch posts newer than the last one we saw, across all WP pages
+  // Fetch all posts (no `after` filter — we cache everything for the dashboard)
+  // 25s timeout: this runs in background via after() so has more headroom
   const fetchOpts = {
     categoryDepts: cfg.categoryDepts as number[],
     categoryLevels: cfg.categoryLevels as number[],
     searchString: cfg.searchString ?? '',
-    after: st?.lastPostDate ?? undefined,
     perPage: 100,
+    timeoutMs: 25000,
   }
   const firstPage = await fetchConcursos({ ...fetchOpts, page: 1 })
   const allPosts: WpPost[] = [...firstPage.posts]
