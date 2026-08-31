@@ -374,14 +374,12 @@ export default function Dashboard({
               >
                 <span>✉️</span> Alertas por email
               </button>
-              {user.isSuperadmin && (
-                <button
-                  onClick={() => { setModalOpen('invites'); setDropdownOpen(false) }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-2"
-                >
-                  <span>👥</span> Accesos invitados
-                </button>
-              )}
+              <button
+                onClick={() => { setModalOpen('invites'); setDropdownOpen(false) }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-2"
+              >
+                <span>👥</span> Accesos invitados
+              </button>
               {appState?.lastRunAt && (
                 <div className="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
                   Último bot: {formatDate(appState.lastRunAt)}
@@ -780,10 +778,10 @@ export default function Dashboard({
         </Modal>
       )}
 
-      {/* ── Invites modal (superadmin) ─────────────────────────── */}
-      {modalOpen === 'invites' && user.isSuperadmin && (
+      {/* ── Invites modal ──────────────────────────────────────── */}
+      {modalOpen === 'invites' && (
         <Modal title="Accesos invitados" onClose={() => setModalOpen(null)}>
-          <InvitePanel />
+          <InvitePanel user={user} />
         </Modal>
       )}
 

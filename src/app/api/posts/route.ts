@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchConcursos, type WpPost } from '@/lib/fetcher'
+import { getUser } from '@/lib/get-user'
+import { notifyError } from '@/lib/error-notify'
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
@@ -50,6 +52,17 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ posts: allPosts, total: allPosts.length, totalPages: 1 })
   } catch (e) {
+    let userEmail: string | undefined
+    try {
+      const auth = await getUser()
+      if (auth.ok) userEmail = auth.user.email
+    } catch {}
+    await notifyError({
+      endpoint: 'GET /api/posts',
+      error: e,
+      userEmail,
+      extra: { depts, levels, search, afterDays },
+    })
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

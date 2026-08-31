@@ -10,7 +10,11 @@ interface Invite {
   invitedAt: string
 }
 
-export default function InvitePanel() {
+interface Props {
+  user: { email: string; isSuperadmin: boolean }
+}
+
+export default function InvitePanel({ user }: Props) {
   const [invites, setInvites] = useState<Invite[]>([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
@@ -128,19 +132,26 @@ export default function InvitePanel() {
               key={inv.id}
               className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-800 truncate">{inv.label || inv.email}</p>
                 {inv.label && (
                   <p className="text-xs text-gray-400 truncate">{inv.email}</p>
                 )}
+                {inv.invitedBy && (
+                  <p className="text-xs text-gray-400 truncate">
+                    Referente: {inv.invitedBy}
+                  </p>
+                )}
               </div>
-              <button
-                onClick={() => handleRemove(inv.email)}
-                className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 text-lg leading-none"
-                title="Eliminar acceso"
-              >
-                ×
-              </button>
+              {user.isSuperadmin && (
+                <button
+                  onClick={() => handleRemove(inv.email)}
+                  className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 text-lg leading-none"
+                  title="Eliminar acceso"
+                >
+                  ×
+                </button>
+              )}
             </li>
           ))}
         </ul>
