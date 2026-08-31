@@ -42,10 +42,18 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
   // Do NOT pass searchString to WP: WP search is not accent-insensitive and matches
   // full post body (too broad). All text filtering is done client-side below.
 
-  const res = await fetch(`${WP_API_BASE}/posts?${params}`, {
-    headers: { 'User-Agent': 'ConcursosCGEBot/1.0 (+https://puntoindigo.com)' },
-    cache: 'no-store',
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8000)
+  let res: Response
+  try {
+    res = await fetch(`${WP_API_BASE}/posts?${params}`, {
+      headers: { 'User-Agent': 'ConcursosCGEBot/1.0 (+https://puntoindigo.com)' },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!res.ok) {
     if (res.status === 400) return { posts: [], total: 0, totalPages: 0 }
