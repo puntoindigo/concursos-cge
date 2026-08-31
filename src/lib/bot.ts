@@ -1,7 +1,7 @@
 import { getDb } from '@/db'
-import { config as configTable, state as stateTable, runHistory } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { fetchConcursos } from './fetcher'
+import { config as configTable, state as stateTable, runHistory, cachedPosts } from '@/db/schema'
+import { eq, sql } from 'drizzle-orm'
+import { fetchConcursos, type WpPost } from './fetcher'
 import { sendConcursosEmail } from './mailer'
 
 export interface BotRunResult {
@@ -19,18 +19,58 @@ export async function runBot(forceEmailEvenIfEmpty = false): Promise<BotRunResul
 
   const [st] = await db.select().from(stateTable).limit(1)
 
-  // Fetch posts newer than the last one we saw
-  const { posts } = await fetchConcursos({
+  // Fetch posts newer than the last one we saw, across all WP pages
+  const fetchOpts = {
     categoryDepts: cfg.categoryDepts as number[],
     categoryLevels: cfg.categoryLevels as number[],
     searchString: cfg.searchString ?? '',
     after: st?.lastPostDate ?? undefined,
     perPage: 100,
-  })
+  }
+  const firstPage = await fetchConcursos({ ...fetchOpts, page: 1 })
+  const allPosts: WpPost[] = [...firstPage.posts]
+  const maxPages = Math.min(firstPage.totalPages, 10)
+  if (maxPages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: maxPages - 1 }, (_, i) =>
+        fetchConcursos({ ...fetchOpts, page: i + 2 })
+      )
+    )
+    rest.forEach((r) => allPosts.push(...r.posts))
+  }
+  const posts = allPosts
 
   const now = new Date()
   let emailSent = false
   let errorMsg: string | undefined
+
+  // Persist fetched posts to cache so the dashboard can read from DB (fast)
+  if (posts.length > 0) {
+    await db
+      .insert(cachedPosts)
+      .values(
+        posts.map((p) => ({
+          wpId: p.id,
+          date: new Date(p.date),
+          title: p.title.rendered,
+          link: p.link,
+          excerpt: p.excerpt.rendered,
+          categories: p.categories,
+          cachedAt: now,
+        }))
+      )
+      .onConflictDoUpdate({
+        target: cachedPosts.wpId,
+        set: {
+          date: sql`excluded.date`,
+          title: sql`excluded.title`,
+          link: sql`excluded.link`,
+          excerpt: sql`excluded.excerpt`,
+          categories: sql`excluded.categories`,
+          cachedAt: sql`excluded.cached_at`,
+        },
+      })
+  }
 
   if (posts.length > 0 || forceEmailEvenIfEmpty) {
     if (posts.length > 0 && cfg.emailTo) {

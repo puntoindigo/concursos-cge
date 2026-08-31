@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchConcursos, type WpPost } from '@/lib/fetcher'
+import { getDb } from '@/db'
+import { cachedPosts } from '@/db/schema'
+import { and, gt, desc } from 'drizzle-orm'
+import { decodeHtml, removeAccents } from '@/lib/fetcher'
 import { getUser } from '@/lib/get-user'
 import { notifyError } from '@/lib/error-notify'
 
@@ -10,47 +13,60 @@ export async function GET(req: NextRequest) {
   const search = sp.get('search') ?? ''
   const afterDays = parseInt(sp.get('afterDays') ?? '0')
 
-  let after: string | undefined
+  let after: Date | undefined
   if (afterDays > 0) {
     const d = new Date()
-    // afterDays=1 → "Hoy" → subtract 0 days (today midnight)
-    // afterDays=7/15/30 → subtract N days
     const daysBack = afterDays === 1 ? 0 : afterDays
     d.setDate(d.getDate() - daysBack)
     d.setHours(0, 0, 0, 0)
-    after = d.toISOString()
-  }
-
-  const baseOpts = {
-    categoryDepts: depts,
-    categoryLevels: levels,
-    searchString: search,
-    after,
-    perPage: 100,
+    after = d
   }
 
   try {
-    // Always aggregate up to 5 WP pages in parallel.
-    // Reasons:
-    //   1. WP `categories` filter is OR; we need AND → client-side filter drops most results
-    //      per page, so we must look across multiple pages to find all matches.
-    //   2. WP `search` is not used (accent issues), so all text filtering is client-side —
-    //      same problem: many WP posts per page may be filtered out.
-    // Result: always return totalPages=1 → no spurious "Ver más" button.
-    const firstResult = await fetchConcursos({ ...baseOpts, page: 1 })
-    const allPosts: WpPost[] = [...firstResult.posts]
+    const db = getDb()
 
-    const maxWpPages = Math.min(firstResult.totalPages, 5)
-    if (maxWpPages > 1) {
-      const rest = await Promise.all(
-        Array.from({ length: maxWpPages - 1 }, (_, i) =>
-          fetchConcursos({ ...baseOpts, page: i + 2 })
-        )
+    const rows = await db
+      .select()
+      .from(cachedPosts)
+      .where(after ? and(gt(cachedPosts.date, after)) : undefined)
+      .orderBy(desc(cachedPosts.date))
+
+    // Map to the WpPost shape the Dashboard expects
+    let posts = rows.map((r) => ({
+      id: r.wpId,
+      date: r.date.toISOString(),
+      title: { rendered: r.title },
+      link: r.link,
+      excerpt: { rendered: r.excerpt },
+      categories: r.categories as number[],
+    }))
+
+    // Category AND filter (same logic as fetcher.ts)
+    if (depts.length && levels.length) {
+      posts = posts.filter(
+        (p) =>
+          depts.some((id) => p.categories.includes(id)) &&
+          levels.some((id) => p.categories.includes(id))
       )
-      rest.forEach((r) => allPosts.push(...r.posts))
+    } else if (depts.length) {
+      posts = posts.filter((p) => depts.some((id) => p.categories.includes(id)))
+    } else if (levels.length) {
+      posts = posts.filter((p) => levels.some((id) => p.categories.includes(id)))
     }
 
-    return NextResponse.json({ posts: allPosts, total: allPosts.length, totalPages: 1 })
+    // Accent-insensitive text search across title + excerpt
+    if (search.trim()) {
+      const tokens = removeAccents(search.trim().toLowerCase()).split(/\s+/).filter(Boolean)
+      posts = posts.filter((p) => {
+        const haystack =
+          removeAccents(decodeHtml(p.title.rendered).toLowerCase()) +
+          ' ' +
+          removeAccents(decodeHtml(p.excerpt.rendered).toLowerCase())
+        return tokens.every((tok) => haystack.includes(tok))
+      })
+    }
+
+    return NextResponse.json({ posts, total: posts.length, totalPages: 1 })
   } catch (e) {
     let userEmail: string | undefined
     try {

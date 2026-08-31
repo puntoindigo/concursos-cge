@@ -40,3 +40,13 @@ export const runHistory = concursosCge.table('run_history', {
   emailTo: text('email_to'),
   postsData: jsonb('posts_data').$type<{ id: number; title: string; link: string; date: string }[]>(),
 })
+
+export const cachedPosts = concursosCge.table('cached_posts', {
+  wpId: integer('wp_id').primaryKey(),
+  date: timestamp('date').notNull(),
+  title: text('title').notNull(),
+  link: text('link').notNull(),
+  excerpt: text('excerpt').notNull().default(''),
+  categories: jsonb('categories').$type<number[]>().notNull().default([]),
+  cachedAt: timestamp('cached_at').defaultNow(),
+})

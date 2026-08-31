@@ -108,7 +108,7 @@ export async function fetchConcursos(opts: FetchOptions): Promise<FetchResult> {
 }
 
 /** Normalize accented characters so "física" matches "fisica". */
-function removeAccents(str: string): string {
+export function removeAccents(str: string): string {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
