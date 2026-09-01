@@ -155,6 +155,10 @@ export default function Dashboard({
   const [contentLoading, setContentLoading] = useState(false)
 
   const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Always holds the latest query args so the retry timer can use them without a stale closure
+  const latestQueryRef = useRef({ cfg, afterDays, areaFilter })
+  useEffect(() => { latestQueryRef.current = { cfg, afterDays, areaFilter } })
+  const [retryCount, setRetryCount] = useState(0)
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -232,6 +236,7 @@ export default function Dashboard({
     setPage(1)
     setPosts([])
     setLoading(true)
+    setRetryCount(0)
     if (fetchTimer.current) clearTimeout(fetchTimer.current)
     const combined = [areaFilter, cfg.searchString].filter(Boolean).join(' ').trim()
     fetchTimer.current = setTimeout(() => fetchPosts({ ...cfg, searchString: combined }, 1, afterDays), 150)
@@ -239,6 +244,20 @@ export default function Dashboard({
   }, [cfg.categoryDepts, cfg.categoryLevels, cfg.searchString, areaFilter, afterDays, fetchPosts])
   // NOTE: no separate useEffect for load-more — it's handled directly in the button click
   // to avoid race conditions when filters change while page > 1.
+
+  // When a background refresh was dispatched, re-check after 75s so the result
+  // of the GitHub Actions run (wpApiDown flag or new posts) reaches the client.
+  // Max 2 retries to avoid hammering if Actions keeps failing.
+  useEffect(() => {
+    if (!cacheRefreshing || retryCount >= 2) return
+    const timer = setTimeout(() => {
+      setRetryCount((n) => n + 1)
+      const { cfg: c, afterDays: d, areaFilter: a } = latestQueryRef.current
+      const combined = [a, c.searchString].filter(Boolean).join(' ').trim()
+      fetchPosts({ ...c, searchString: combined }, 1, d)
+    }, 75_000)
+    return () => clearTimeout(timer)
+  }, [cacheRefreshing, retryCount, fetchPosts])
 
   function toggleDept(id: number) {
     setCfg((c) => ({
@@ -606,10 +625,12 @@ export default function Dashboard({
 
           {posts.length === 0 && !loading ? (
             <div className="text-center py-20 text-gray-400">
-              <div className="text-4xl mb-3">{cacheRefreshing ? '🔄' : '🔍'}</div>
+              <div className="text-4xl mb-3">{wpApiDown ? '⚠️' : cacheRefreshing ? '🔄' : '🔍'}</div>
               <p className="text-sm">
-                {cacheRefreshing
-                  ? 'Actualizando datos en segundo plano... Volvé en un momento.'
+                {wpApiDown
+                  ? 'El sitio del CGE no está disponible. Se mostrarán los datos cuando vuelva en línea.'
+                  : cacheRefreshing
+                  ? 'Verificando si hay nuevos concursos… puede tardar hasta un minuto.'
                   : 'No se encontraron concursos con los filtros actuales.'}
               </p>
             </div>
