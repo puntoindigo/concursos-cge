@@ -37,6 +37,9 @@ async function fetchPage(params: URLSearchParams, page: number) {
     const totalPages = parseInt(res.headers.get('X-WP-TotalPages') ?? '1')
     const posts = await res.json() as { id: number; date: string; title: { rendered: string }; link: string; excerpt: { rendered: string }; categories: number[] }[]
     return { posts, totalPages }
+  } catch (e) {
+    console.warn(`WP API network error on page ${page}:`, (e as Error).message)
+    return null
   } finally {
     clearTimeout(timer)
   }
@@ -69,9 +72,14 @@ async function main() {
   console.log('Fetching page 1...')
   const first = await fetchPage(params, 1)
   if (!first) {
-    console.error('Failed to fetch page 1 — aborting')
+    console.warn('WP API unreachable — updating lastRunAt to avoid repeated dispatches')
+    const now = new Date()
+    await db
+      .insert(schema.state)
+      .values({ id: 1, lastRunAt: now, lastFoundCount: 0 })
+      .onConflictDoUpdate({ target: schema.state.id, set: { lastRunAt: now } })
     await client.end()
-    process.exit(1)
+    process.exit(0)
   }
 
   const allPosts = [...first.posts]
