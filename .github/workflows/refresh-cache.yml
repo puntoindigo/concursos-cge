@@ -1,0 +1,19 @@
+name: Refresh Cache
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - run: npx tsx scripts/refresh-cache.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
