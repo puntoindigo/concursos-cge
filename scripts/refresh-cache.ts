@@ -76,8 +76,8 @@ async function main() {
     const now = new Date()
     await db
       .insert(schema.state)
-      .values({ id: 1, lastRunAt: now, lastFoundCount: 0 })
-      .onConflictDoUpdate({ target: schema.state.id, set: { lastRunAt: now } })
+      .values({ id: 1, lastRunAt: now, lastFoundCount: 0, wpApiDown: true })
+      .onConflictDoUpdate({ target: schema.state.id, set: { lastRunAt: now, wpApiDown: true } })
     await client.end()
     process.exit(0)
   }
@@ -127,10 +127,10 @@ async function main() {
     const newest = filtered[0]
     await db
       .insert(schema.state)
-      .values({ id: 1, lastRunAt: now, lastPostDate: newest.date, lastPostId: newest.id, lastFoundCount: filtered.length })
+      .values({ id: 1, lastRunAt: now, lastPostDate: newest.date, lastPostId: newest.id, lastFoundCount: filtered.length, wpApiDown: false })
       .onConflictDoUpdate({
         target: schema.state.id,
-        set: { lastRunAt: now, lastPostDate: newest.date, lastPostId: newest.id, lastFoundCount: filtered.length },
+        set: { lastRunAt: now, lastPostDate: newest.date, lastPostId: newest.id, lastFoundCount: filtered.length, wpApiDown: false },
       })
 
     console.log(`Done: cached ${filtered.length} posts, lastRunAt=${now.toISOString()}`)
@@ -139,10 +139,10 @@ async function main() {
     const now = new Date()
     await db
       .insert(schema.state)
-      .values({ id: 1, lastRunAt: now, lastFoundCount: 0 })
+      .values({ id: 1, lastRunAt: now, lastFoundCount: 0, wpApiDown: false })
       .onConflictDoUpdate({
         target: schema.state.id,
-        set: { lastRunAt: now, lastFoundCount: 0 },
+        set: { lastRunAt: now, lastFoundCount: 0, wpApiDown: false },
       })
     console.log('Done: 0 posts found (WP API returned empty for these categories)')
   }

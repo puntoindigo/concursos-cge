@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
       totalPages: 1,
       lastRunAt: lastRunAt?.toISOString() ?? null,
       isRefreshing: isStale,
+      wpApiDown: st?.wpApiDown ?? false,
     })
   } catch (e) {
     let userEmail: string | undefined

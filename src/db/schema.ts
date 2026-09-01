@@ -22,6 +22,8 @@ export const state = concursosCge.table('state', {
   lastPostDate: text('last_post_date'),
   lastPostId: integer('last_post_id'),
   lastFoundCount: integer('last_found_count').notNull().default(0),
+  // true when the last refresh attempt couldn't reach cge.entrerios.gov.ar
+  wpApiDown: boolean('wp_api_down').notNull().default(false),
 })
 
 export const allowedEmails = concursosCge.table('allowed_emails', {
