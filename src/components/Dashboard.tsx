@@ -247,9 +247,9 @@ export default function Dashboard({
 
   // When a background refresh was dispatched, re-check after 75s so the result
   // of the GitHub Actions run (wpApiDown flag or new posts) reaches the client.
-  // Max 2 retries to avoid hammering if Actions keeps failing.
+  // Max 5 retries to keep checking while the user has the page open.
   useEffect(() => {
-    if (!cacheRefreshing || retryCount >= 2) return
+    if (!cacheRefreshing || retryCount >= 5) return
     const timer = setTimeout(() => {
       setRetryCount((n) => n + 1)
       const { cfg: c, afterDays: d, areaFilter: a } = latestQueryRef.current
@@ -614,7 +614,7 @@ export default function Dashboard({
               {cacheRefreshing && !loading && (
                 <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
                   <span className="inline-block w-3 h-3 border border-amber-500 border-t-transparent rounded-full animate-spin" />
-                  Actualizando…
+                  {retryCount > 0 ? `Reintentando… (${retryCount}/5)` : 'Actualizando…'}
                 </span>
               )}
               {loading && (
@@ -630,7 +630,9 @@ export default function Dashboard({
                 {wpApiDown
                   ? 'El sitio del CGE no está disponible. Se mostrarán los datos cuando vuelva en línea.'
                   : cacheRefreshing
-                  ? 'Verificando si hay nuevos concursos… puede tardar hasta un minuto.'
+                  ? retryCount > 0
+                    ? `Verificando si el CGE volvió en línea… (intento ${retryCount} de 5)`
+                    : 'Verificando si hay nuevos concursos… puede tardar hasta un minuto.'
                   : 'No se encontraron concursos con los filtros actuales.'}
               </p>
             </div>

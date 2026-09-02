@@ -86,7 +86,7 @@ export default function InvitePanel({ user }: Props) {
   return (
     <div className="p-5">
       <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">
-        Accesos invitados
+        {user.isSuperadmin ? 'Todos los accesos' : 'Mis invitados'}
       </h2>
 
       {/* Invite form */}
@@ -137,21 +137,19 @@ export default function InvitePanel({ user }: Props) {
                 {inv.label && (
                   <p className="text-xs text-gray-400 truncate">{inv.email}</p>
                 )}
-                {inv.invitedBy && (
+                {user.isSuperadmin && inv.invitedBy && (
                   <p className="text-xs text-gray-400 truncate">
                     Referente: {inv.invitedBy}
                   </p>
                 )}
               </div>
-              {user.isSuperadmin && (
-                <button
-                  onClick={() => handleRemove(inv.email)}
-                  className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 text-lg leading-none"
-                  title="Eliminar acceso"
-                >
-                  ×
-                </button>
-              )}
+              <button
+                onClick={() => handleRemove(inv.email)}
+                className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 text-lg leading-none"
+                title="Eliminar acceso"
+              >
+                ×
+              </button>
             </li>
           ))}
         </ul>

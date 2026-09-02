@@ -13,12 +13,16 @@ export async function GET() {
   const auth = await getUser();
   if (!auth.ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  const callerEmail = auth.user.email.toLowerCase();
+  const isSuperadmin = callerEmail === SUPERADMIN;
+
   try {
     const db = getDb();
-    const rows = await db
-      .select()
-      .from(allowedEmails)
-      .orderBy(allowedEmails.invitedAt);
+    const rows = isSuperadmin
+      ? await db.select().from(allowedEmails).orderBy(allowedEmails.invitedAt)
+      : await db.select().from(allowedEmails)
+          .where(eq(allowedEmails.invitedBy, callerEmail))
+          .orderBy(allowedEmails.invitedAt);
 
     return NextResponse.json({ invites: rows });
   } catch (e) {
@@ -84,9 +88,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await getUser();
   if (!auth.ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (auth.user.email.toLowerCase() !== SUPERADMIN) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+
+  const callerEmail = auth.user.email.toLowerCase();
+  const isSuperadmin = callerEmail === SUPERADMIN;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -98,6 +102,17 @@ export async function DELETE(req: NextRequest) {
     }
 
     const db = getDb();
+
+    // Non-superadmin users can only delete invites they created
+    if (!isSuperadmin) {
+      const rows = await db.select({ invitedBy: allowedEmails.invitedBy })
+        .from(allowedEmails)
+        .where(eq(allowedEmails.email, email));
+      if (!rows.length || rows[0].invitedBy !== callerEmail) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+    }
+
     await db.delete(allowedEmails).where(eq(allowedEmails.email, email));
 
     return NextResponse.json({ ok: true });
