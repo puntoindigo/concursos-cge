@@ -31,7 +31,7 @@ export const CATEGORY_NAME: Record<number, string> = Object.fromEntries(
 export const AREAS = [
   { id: 'ef',    name: 'Educación Física',    term: 'educación física' },
   { id: 'tec',   name: 'Técnica',             term: 'técnica' },
-  { id: 'arte',  name: 'Arte / Música',       term: 'artística' },
+  { id: 'arte',  name: 'Arte / Música',       term: 'arte' },
   { id: 'esp',   name: 'Educación Especial',  term: 'especial' },
   { id: 'adult', name: 'Jóvenes y Adultos',   term: 'adultos' },
   { id: 'priv',  name: 'Privada',             term: 'privada' },

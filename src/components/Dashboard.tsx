@@ -73,14 +73,16 @@ function levelBadge(categoryIds: number[]) {
   }
 }
 
-function cronToHumanART(cron: string): string {
+function cronToARTHour(cron: string): number {
   const parts = cron.split(' ')
-  if (parts.length < 2) return cron
-  const minUTC = parseInt(parts[0])
-  const hourUTC = parseInt(parts[1])
-  if (isNaN(hourUTC)) return cron
-  const hourART = (hourUTC - 3 + 24) % 24
-  return `${String(hourART).padStart(2, '0')}:${String(minUTC).padStart(2, '0')} hs (hora Argentina)`
+  if (parts.length < 2) return 8
+  const utcHour = parseInt(parts[1])
+  if (isNaN(utcHour)) return 8
+  return (utcHour - 3 + 24) % 24
+}
+
+function artHourToCron(artHour: number): string {
+  return `0 ${(artHour + 3) % 24} * * *`
 }
 
 function CategoryBadges({ ids }: { ids: number[] }) {
@@ -284,7 +286,7 @@ export default function Dashboard({
       const res = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cfg),
+        body: JSON.stringify({ ...cfg, emailTo: user.email, searchString: areaFilter }),
       })
       const data = await res.json()
       setSaveMsg(data.ok ? '✓ Configuración guardada' : 'Error al guardar')
@@ -611,6 +613,19 @@ export default function Dashboard({
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {botMsg && (
+                <span className={`text-xs px-2 py-1 rounded-full ${botMsg.startsWith('Error') ? 'text-red-600 bg-red-50' : 'text-green-700 bg-green-50'}`}>
+                  {botMsg}
+                </span>
+              )}
+              <button
+                onClick={() => runBotNow(false)}
+                disabled={botRunning || loading}
+                title="Buscar nuevos concursos ahora"
+                className="text-xs px-3 py-1.5 bg-white border border-gray-200 hover:border-indigo-400 hover:text-indigo-700 text-gray-600 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {botRunning ? 'Buscando…' : '↻ Actualizar'}
+              </button>
               {cacheRefreshing && !loading && (
                 <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
                   <span className="inline-block w-3 h-3 border border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -749,40 +764,52 @@ export default function Dashboard({
       {modalOpen === 'alerts' && (
         <Modal title="Alertas por email" onClose={() => setModalOpen(null)}>
           <div className="space-y-4">
+            {/* Destination — read-only, always logged-in user */}
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Enviar a</label>
-              <input
-                type="email"
-                placeholder="destino@ejemplo.com"
-                value={cfg.emailTo}
-                onChange={(e) => setCfg((c) => ({ ...c, emailTo: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+              <p className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-700">{user.email}</p>
             </div>
+
+            {/* Active filters summary */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Término de búsqueda para el bot
-              </label>
-              <input
-                type="text"
-                placeholder="ej: maestro, cátedra..."
-                value={cfg.searchString}
-                onChange={(e) => setCfg((c) => ({ ...c, searchString: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Filtros activos (el bot usará estos)</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg space-y-0.5">
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Departamento:</span>{' '}
+                  {cfg.categoryDepts.length ? cfg.categoryDepts.map((id) => CATEGORY_NAME[id]).join(', ') : 'Ninguno'}
+                </p>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Nivel:</span>{' '}
+                  {cfg.categoryLevels.length ? cfg.categoryLevels.map((id) => CATEGORY_NAME[id]).join(', ') : 'Ninguno'}
+                </p>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Área:</span>{' '}
+                  {areaFilter ? (AREAS.find((a) => a.term === areaFilter)?.name ?? areaFilter) : 'Todas'}
+                </p>
+                {cfg.searchString && (
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium text-gray-700">Búsqueda:</span>{' '}
+                    &ldquo;{cfg.searchString}&rdquo;
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* ART hour picker */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Horario (cron UTC)
-              </label>
-              <input
-                type="text"
-                value={cfg.scheduleCron}
-                onChange={(e) => setCfg((c) => ({ ...c, scheduleCron: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              />
-              <p className="text-xs text-indigo-600 mt-1">{cronToHumanART(cfg.scheduleCron)}</p>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Horario de envío (hora Argentina)</label>
+              <select
+                value={cronToARTHour(cfg.scheduleCron)}
+                onChange={(e) => setCfg((c) => ({ ...c, scheduleCron: artHourToCron(Number(e.target.value)) }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{String(h).padStart(2, '0')}:00 hs</option>
+                ))}
+              </select>
             </div>
+
+            {/* Active toggle */}
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -793,6 +820,7 @@ export default function Dashboard({
               />
               <label htmlFor="isActive" className="text-sm text-gray-700">Bot activo</label>
             </div>
+
             <button
               onClick={saveConfig}
               disabled={saving}
@@ -805,23 +833,17 @@ export default function Dashboard({
                 {saveMsg}
               </p>
             )}
-            <div className="pt-3 border-t border-gray-100 space-y-2">
-              <button
-                onClick={() => runBotNow(false)}
-                disabled={botRunning}
-                className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
-              >
-                {botRunning ? 'Ejecutando…' : '▶ Buscar nuevos ahora'}
-              </button>
+
+            <div className="pt-3 border-t border-gray-100">
               <button
                 onClick={() => runBotNow(true)}
-                disabled={botRunning || !cfg.emailTo}
+                disabled={botRunning || !user.email}
                 className="w-full py-2 px-4 border border-indigo-300 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 text-sm font-semibold rounded-lg transition-colors"
               >
                 Enviar prueba por email
               </button>
               {botMsg && (
-                <p className={`text-xs text-center font-medium ${botMsg.startsWith('Error') ? 'text-red-500' : 'text-green-600'}`}>
+                <p className={`text-xs text-center font-medium mt-2 ${botMsg.startsWith('Error') ? 'text-red-500' : 'text-green-600'}`}>
                   {botMsg}
                 </p>
               )}
