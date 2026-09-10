@@ -32,9 +32,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const forceEmail = body.forceEmail === true
+  const overrides = (body.depts || body.levels || body.searchString !== undefined || body.emailTo)
+    ? {
+        depts: Array.isArray(body.depts) ? body.depts : undefined,
+        levels: Array.isArray(body.levels) ? body.levels : undefined,
+        searchString: typeof body.searchString === 'string' ? body.searchString : undefined,
+        emailTo: typeof body.emailTo === 'string' ? body.emailTo : undefined,
+      }
+    : undefined
 
   try {
-    const result = await runBot(forceEmail)
+    const result = await runBot(forceEmail, overrides)
     return NextResponse.json(result)
   } catch (e) {
     let userEmail: string | undefined

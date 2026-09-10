@@ -11,7 +11,10 @@ export interface BotRunResult {
   error?: string
 }
 
-export async function runBot(forceEmailEvenIfEmpty = false): Promise<BotRunResult> {
+export async function runBot(
+  forceEmailEvenIfEmpty = false,
+  overrides?: { depts?: number[]; levels?: number[]; searchString?: string; emailTo?: string }
+): Promise<BotRunResult> {
   const db = getDb()
 
   const [cfg] = await db.select().from(configTable).limit(1)
@@ -20,9 +23,9 @@ export async function runBot(forceEmailEvenIfEmpty = false): Promise<BotRunResul
   const [st] = await db.select().from(stateTable).limit(1)
 
   const fetchOpts = {
-    categoryDepts: cfg.categoryDepts as number[],
-    categoryLevels: cfg.categoryLevels as number[],
-    searchString: cfg.searchString ?? '',
+    categoryDepts: overrides?.depts ?? (cfg.categoryDepts as number[]),
+    categoryLevels: overrides?.levels ?? (cfg.categoryLevels as number[]),
+    searchString: overrides?.searchString ?? cfg.searchString ?? '',
     perPage: 100,
     timeoutMs: 25000,
   }
@@ -76,6 +79,7 @@ export async function runBot(forceEmailEvenIfEmpty = false): Promise<BotRunResul
     })
 
   let emailSent = false
+  const effectiveEmailTo = overrides?.emailTo || cfg.emailTo
 
   if (!wpApiDown) {
     // Persist fetched posts to cache
@@ -106,13 +110,13 @@ export async function runBot(forceEmailEvenIfEmpty = false): Promise<BotRunResul
         })
     }
 
-    if ((posts.length > 0 || forceEmailEvenIfEmpty) && cfg.emailTo && posts.length > 0) {
+    if ((posts.length > 0 || forceEmailEvenIfEmpty) && effectiveEmailTo && posts.length > 0) {
       try {
         await sendConcursosEmail(
           posts,
-          cfg.emailTo,
-          cfg.categoryDepts as number[],
-          cfg.categoryLevels as number[]
+          effectiveEmailTo,
+          overrides?.depts ?? (cfg.categoryDepts as number[]),
+          overrides?.levels ?? (cfg.categoryLevels as number[])
         )
         emailSent = true
       } catch (e) {
@@ -126,7 +130,7 @@ export async function runBot(forceEmailEvenIfEmpty = false): Promise<BotRunResul
     ranAt: now,
     postsFound: posts.length,
     emailSent,
-    emailTo: cfg.emailTo,
+    emailTo: effectiveEmailTo,
     wpApiDown,
     postsData: posts.map((p) => ({
       id: p.id,

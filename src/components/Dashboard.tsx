@@ -179,6 +179,7 @@ export default function Dashboard({
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [botRunning, setBotRunning] = useState(false)
   const [botMsg, setBotMsg] = useState<string | null>(null)
+  const [sendToEmail, setSendToEmail] = useState('')
 
   // UI: user dropdown + modals
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -311,6 +312,19 @@ export default function Dashboard({
     return () => clearTimeout(timer)
   }, [cacheRefreshing, retryCount, fetchPosts])
 
+  // Auto-refresh: every 60s check if lastRunAt is > 20 min old; if so, refresh posts
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const { cfg: c, afterDays: d, areaFilter: a } = latestQueryRef.current
+      const lastRun = appState?.lastRunAt ? new Date(appState.lastRunAt).getTime() : 0
+      if (!lastRun || Date.now() - lastRun > 20 * 60 * 1000) {
+        const combined = [a, c.searchString].filter(Boolean).join(' ').trim()
+        fetchPosts({ ...c, searchString: combined }, 1, d)
+      }
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [appState?.lastRunAt, fetchPosts])
+
   function toggleDept(id: number) {
     setCfg((c) => ({
       ...c,
@@ -348,14 +362,21 @@ export default function Dashboard({
     }
   }
 
-  async function runBotNow(forceEmail = false) {
+  async function runBotNow(forceEmail = false, emailOverride?: string) {
     setBotRunning(true)
     setBotMsg(null)
+    const combined = [areaFilter, cfg.searchString].filter(Boolean).join(' ').trim()
     try {
       const res = await fetch('/api/bot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ forceEmail }),
+        body: JSON.stringify({
+          forceEmail,
+          depts: cfg.categoryDepts,
+          levels: cfg.categoryLevels,
+          searchString: combined,
+          ...(emailOverride ? { emailTo: emailOverride } : {}),
+        }),
       })
       const data = await res.json()
       if (data.error) {
@@ -671,19 +692,6 @@ export default function Dashboard({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {botMsg && (
-                <span className={`text-xs px-2 py-1 rounded-full ${botMsg.startsWith('Error') ? 'text-red-600 bg-red-50' : 'text-green-700 bg-green-50'}`}>
-                  {botMsg}
-                </span>
-              )}
-              <button
-                onClick={() => runBotNow(false)}
-                disabled={botRunning || loading}
-                title="Buscar nuevos concursos ahora"
-                className="text-xs px-3 py-1.5 bg-white border border-gray-200 hover:border-indigo-400 hover:text-indigo-700 text-gray-600 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {botRunning ? 'Buscando…' : '↻ Actualizar'}
-              </button>
               {cacheRefreshing && !loading && (
                 <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
                   <span className="inline-block w-3 h-3 border border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -848,10 +856,17 @@ export default function Dashboard({
               </div>
             </div>
 
-            {/* Destination — read-only, always logged-in user */}
+            {/* Destination — editable, defaults to logged-in user */}
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Enviar a</label>
-              <p className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-700">{user.email}</p>
+              <input
+                type="email"
+                value={sendToEmail}
+                onChange={(e) => setSendToEmail(e.target.value)}
+                placeholder={user.email}
+                className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-400"
+              />
+              <p className="text-xs text-gray-400 mt-0.5">Si se deja vacío, se usa tu email ({user.email})</p>
             </div>
 
             {/* Active filters summary */}
@@ -923,7 +938,7 @@ export default function Dashboard({
 
             <div className="pt-3 border-t border-gray-100">
               <button
-                onClick={() => runBotNow(true)}
+                onClick={() => runBotNow(true, sendToEmail || user.email)}
                 disabled={botRunning || !user.email}
                 className="w-full py-2 px-4 border border-indigo-300 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 text-sm font-semibold rounded-lg transition-colors"
               >
