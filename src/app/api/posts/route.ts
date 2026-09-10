@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after as scheduleAfter } from 'next/server'
 import { getDb } from '@/db'
-import { cachedPosts, state as stateTable } from '@/db/schema'
+import { cachedPosts, state as stateTable, userQueryLog } from '@/db/schema'
 import { and, gt, desc } from 'drizzle-orm'
 import { decodeHtml, removeAccents } from '@/lib/fetcher'
 import { getUser } from '@/lib/get-user'
@@ -31,6 +31,13 @@ async function dispatchRefreshWorkflow() {
 }
 
 export async function GET(req: NextRequest) {
+  // Auth check — all routes require a valid session
+  const auth = await getUser()
+  if (!auth.ok) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userEmail = auth.user.email
+
   const sp = req.nextUrl.searchParams
   const depts = sp.get('depts')?.split(',').map(Number).filter(Boolean) ?? []
   const levels = sp.get('levels')?.split(',').map(Number).filter(Boolean) ?? []
@@ -101,6 +108,20 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // Log this query asynchronously (non-blocking)
+    scheduleAfter(async () => {
+      try {
+        const db2 = getDb()
+        await db2.insert(userQueryLog).values({
+          userEmail,
+          depts: depts.length ? depts : null,
+          levels: levels.length ? levels : null,
+          search: search || null,
+          resultsCount: posts.length,
+        })
+      } catch {}
+    })
+
     return NextResponse.json({
       posts,
       total: posts.length,
@@ -110,11 +131,6 @@ export async function GET(req: NextRequest) {
       wpApiDown: st?.wpApiDown ?? false,
     })
   } catch (e) {
-    let userEmail: string | undefined
-    try {
-      const auth = await getUser()
-      if (auth.ok) userEmail = auth.user.email
-    } catch {}
     await notifyError({
       endpoint: 'GET /api/posts',
       error: e,

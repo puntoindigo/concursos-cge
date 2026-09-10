@@ -35,7 +35,26 @@ interface AppState {
   lastPostDate: string | null
 }
 
-type ModalType = 'alerts' | 'invites' | 'logout' | null
+type ModalType = 'alerts' | 'invites' | 'logout' | 'logs' | null
+
+interface RunLog {
+  id: number
+  ranAt: string
+  postsFound: number
+  emailSent: boolean
+  emailTo: string | null
+  wpApiDown: boolean
+}
+
+interface QueryLog {
+  id: number
+  queriedAt: string
+  userEmail: string | null
+  depts: number[] | null
+  levels: number[] | null
+  search: string | null
+  resultsCount: number
+}
 
 function decodeHtml(html: string) {
   return html
@@ -83,6 +102,21 @@ function cronToARTHour(cron: string): number {
 
 function artHourToCron(artHour: number): string {
   return `0 ${(artHour + 3) % 24} * * *`
+}
+
+function nextCronRunART(cron: string): string {
+  const artHour = cronToARTHour(cron)
+  const artNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }))
+  const next = new Date(artNow)
+  next.setHours(artHour, 0, 0, 0)
+  if (artNow.getHours() > artHour || (artNow.getHours() === artHour && artNow.getMinutes() > 0)) {
+    next.setDate(next.getDate() + 1)
+  }
+  return next.toLocaleDateString('es-AR', {
+    weekday: 'short', day: '2-digit', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  })
 }
 
 function CategoryBadges({ ids }: { ids: number[] }) {
@@ -151,6 +185,11 @@ export default function Dashboard({
   const [modalOpen, setModalOpen] = useState<ModalType>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  // Admin logs
+  const [adminLogs, setAdminLogs] = useState<{ runs: RunLog[]; queries: QueryLog[] } | null>(null)
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [logsTab, setLogsTab] = useState<'runs' | 'queries'>('runs')
+
   // Post detail modal
   const [selectedPost, setSelectedPost] = useState<WpPost | null>(null)
   const [postContent, setPostContent] = useState<string | null>(null)
@@ -161,6 +200,17 @@ export default function Dashboard({
   const latestQueryRef = useRef({ cfg, afterDays, areaFilter })
   useEffect(() => { latestQueryRef.current = { cfg, afterDays, areaFilter } })
   const [retryCount, setRetryCount] = useState(0)
+
+  // Load admin logs when the logs modal opens
+  useEffect(() => {
+    if (modalOpen !== 'logs') return
+    setLogsLoading(true)
+    fetch('/api/admin/logs')
+      .then((r) => r.json())
+      .then((data) => setAdminLogs(data))
+      .catch(() => {})
+      .finally(() => setLogsLoading(false))
+  }, [modalOpen])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -405,10 +455,13 @@ export default function Dashboard({
               >
                 <span>👥</span> Accesos invitados
               </button>
-              {appState?.lastRunAt && (
-                <div className="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
-                  Último bot: {formatDate(appState.lastRunAt)}
-                </div>
+              {user.isSuperadmin && (
+                <button
+                  onClick={() => { setModalOpen('logs'); setDropdownOpen(false) }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-2"
+                >
+                  <span>📊</span> Log de sistema
+                </button>
               )}
               <div className="border-t border-gray-100 mt-1">
                 <button
@@ -423,18 +476,23 @@ export default function Dashboard({
         </div>
       </header>
 
-      {/* ── API down banner ────────────────────────────────────── */}
-      {wpApiDown && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center gap-2.5 text-sm text-amber-800">
-          <svg className="w-4 h-4 flex-shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-          <span>
-            <strong>Fuente de datos no disponible.</strong>{' '}
-            El sitio del CGE está temporalmente inaccesible. Estás viendo los datos almacenados del último acceso exitoso.
+      {/* ── Status bar — always visible ─────────────────────────── */}
+      <div className={`border-b px-4 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${wpApiDown ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-100'}`}>
+        <span className="flex items-center gap-1.5">
+          <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${wpApiDown ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+          <span className={`font-semibold ${wpApiDown ? 'text-red-700' : 'text-emerald-700'}`}>
+            {wpApiDown ? 'API CGE CAÍDA' : 'API CGE activa'}
           </span>
-        </div>
-      )}
+        </span>
+        {wpApiDown && (
+          <span className="text-red-600">Estás viendo datos del último acceso exitoso</span>
+        )}
+        <span className="ml-auto text-gray-400">
+          {appState?.lastRunAt
+            ? `Actualizado: ${formatDate(appState.lastRunAt)}`
+            : 'Sin datos de actualización'}
+        </span>
+      </div>
 
       {/* ── Layout ─────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
@@ -764,6 +822,32 @@ export default function Dashboard({
       {modalOpen === 'alerts' && (
         <Modal title="Alertas por email" onClose={() => setModalOpen(null)}>
           <div className="space-y-4">
+            {/* Bot status summary */}
+            <div className={`rounded-xl px-4 py-3 flex items-start gap-3 ${cfg.isActive ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-100 border border-gray-200'}`}>
+              <span className={`mt-0.5 inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-bold ${cfg.isActive ? 'text-emerald-800' : 'text-gray-500'}`}>
+                  Bot {cfg.isActive ? 'ACTIVO' : 'INACTIVO'}
+                </p>
+                {cfg.isActive && (
+                  <p className="text-xs text-emerald-700 mt-0.5">
+                    Próxima ejecución: <strong>{nextCronRunART(cfg.scheduleCron)}</strong>
+                  </p>
+                )}
+                {appState?.lastRunAt && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Última ejecución: {formatDate(appState.lastRunAt)}
+                    {typeof appState.lastFoundCount === 'number' && (
+                      <> — {appState.lastFoundCount} concurso{appState.lastFoundCount !== 1 ? 's' : ''} encontrado{appState.lastFoundCount !== 1 ? 's' : ''}</>
+                    )}
+                  </p>
+                )}
+                {!appState?.lastRunAt && (
+                  <p className="text-xs text-gray-400 mt-0.5">Sin ejecuciones registradas aún</p>
+                )}
+              </div>
+            </div>
+
             {/* Destination — read-only, always logged-in user */}
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Enviar a</label>
@@ -810,15 +894,18 @@ export default function Dashboard({
             </div>
 
             {/* Active toggle */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50">
               <input
                 type="checkbox"
                 id="isActive"
                 checked={cfg.isActive}
                 onChange={(e) => setCfg((c) => ({ ...c, isActive: e.target.checked }))}
-                className="w-4 h-4 rounded accent-indigo-600"
+                className="w-4 h-4 rounded accent-indigo-600 flex-shrink-0"
               />
-              <label htmlFor="isActive" className="text-sm text-gray-700">Bot activo</label>
+              <label htmlFor="isActive" className="text-sm text-gray-700 cursor-pointer select-none">
+                <span className="font-medium">Activar bot</span>
+                <span className="text-gray-400 ml-1.5">— el bot correrá automáticamente al horario elegido</span>
+              </label>
             </div>
 
             <button
@@ -840,7 +927,7 @@ export default function Dashboard({
                 disabled={botRunning || !user.email}
                 className="w-full py-2 px-4 border border-indigo-300 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 text-sm font-semibold rounded-lg transition-colors"
               >
-                Enviar prueba por email
+                {botRunning ? 'Ejecutando…' : 'Enviar prueba por email ahora'}
               </button>
               {botMsg && (
                 <p className={`text-xs text-center font-medium mt-2 ${botMsg.startsWith('Error') ? 'text-red-500' : 'text-green-600'}`}>
@@ -879,6 +966,89 @@ export default function Dashboard({
               Cerrar sesión
             </a>
           </div>
+        </Modal>
+      )}
+
+      {/* ── Admin logs modal ─────────────────────────────────────── */}
+      {modalOpen === 'logs' && (
+        <Modal title="Log del sistema" onClose={() => setModalOpen(null)}>
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 mb-4 -mx-1">
+            <button
+              onClick={() => setLogsTab('runs')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${logsTab === 'runs' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              Ejecuciones del bot
+            </button>
+            <button
+              onClick={() => setLogsTab('queries')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${logsTab === 'queries' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              Consultas de usuarios
+            </button>
+          </div>
+
+          {logsLoading && (
+            <div className="flex justify-center py-10">
+              <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!logsLoading && adminLogs && logsTab === 'runs' && (
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+              {adminLogs.runs.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">Sin ejecuciones registradas</p>
+              )}
+              {adminLogs.runs.map((run) => (
+                <div
+                  key={run.id}
+                  className={`rounded-lg px-3 py-2.5 text-xs border ${run.wpApiDown ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}
+                >
+                  <div className="flex items-center gap-2 justify-between">
+                    <span className="font-semibold text-gray-700">{formatDate(run.ranAt)}</span>
+                    <span className={`font-bold ${run.wpApiDown ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {run.wpApiDown ? 'API CAÍDA' : `${run.postsFound} concurso${run.postsFound !== 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-gray-500">
+                    {run.emailSent && <span className="text-indigo-600">✓ Email enviado</span>}
+                    {!run.emailSent && !run.wpApiDown && <span>Sin email</span>}
+                    {run.emailTo && <span className="truncate">{run.emailTo}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!logsLoading && adminLogs && logsTab === 'queries' && (
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+              {adminLogs.queries.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">Sin consultas registradas</p>
+              )}
+              {adminLogs.queries.map((q) => (
+                <div key={q.id} className="rounded-lg px-3 py-2.5 text-xs border bg-gray-50 border-gray-200">
+                  <div className="flex items-center gap-2 justify-between">
+                    <span className="font-semibold text-gray-700">{formatDate(q.queriedAt)}</span>
+                    <span className="text-indigo-700 font-medium">{q.resultsCount} resultado{q.resultsCount !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-gray-500 flex-wrap">
+                    <span className="text-gray-600 font-medium truncate">{q.userEmail ?? '—'}</span>
+                    {q.depts && q.depts.length > 0 && (
+                      <span>Dpto: {q.depts.map((id) => CATEGORY_NAME[id] ?? id).join(', ')}</span>
+                    )}
+                    {q.levels && q.levels.length > 0 && (
+                      <span>Nivel: {q.levels.map((id) => CATEGORY_NAME[id] ?? id).join(', ')}</span>
+                    )}
+                    {q.search && <span>Búsq: &ldquo;{q.search}&rdquo;</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!logsLoading && !adminLogs && (
+            <p className="text-sm text-red-500 text-center py-6">Error al cargar el log</p>
+          )}
         </Modal>
       )}
     </div>

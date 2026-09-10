@@ -40,7 +40,18 @@ export const runHistory = concursosCge.table('run_history', {
   postsFound: integer('posts_found').notNull().default(0),
   emailSent: boolean('email_sent').notNull().default(false),
   emailTo: text('email_to'),
+  wpApiDown: boolean('wp_api_down').notNull().default(false),
   postsData: jsonb('posts_data').$type<{ id: number; title: string; link: string; date: string }[]>(),
+})
+
+export const userQueryLog = concursosCge.table('user_query_log', {
+  id: integer('id').generatedAlwaysAsIdentity().primaryKey(),
+  queriedAt: timestamp('queried_at').defaultNow(),
+  userEmail: text('user_email'),
+  depts: jsonb('depts').$type<number[]>(),
+  levels: jsonb('levels').$type<number[]>(),
+  search: text('search'),
+  resultsCount: integer('results_count').notNull().default(0),
 })
 
 export const cachedPosts = concursosCge.table('cached_posts', {
