@@ -17,7 +17,7 @@ export default async function Home() {
   const auth = await getUser()
 
   if (!auth.ok) {
-    const loginUrl = `https://accounts.puntoindigo.com/api/auth/signin-google?next=${encodeURIComponent(process.env.APP_URL ?? 'https://concursos-cge.puntoindigo.com')}`
+    const loginUrl = `https://accounts.puntoindigo.com/api/auth/google?next=${encodeURIComponent(process.env.APP_URL ?? 'https://concursos-cge.puntoindigo.com')}`
 
     if (auth.reason === 'not_allowed') {
       const payUrl = checkoutUrl()
