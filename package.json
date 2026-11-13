@@ -30,9 +30,16 @@
     "autoprefixer": "^10.4.21",
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.28.0",
-    "postcss": "^8.5.3",
+    "postcss": "^8.5.32",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "esbuild": ">=0.25.12",
+    "next": {
+      "postcss": "$postcss"
+    },
+    "uuid": ">=11.1.1"
   }
 }
